@@ -74,6 +74,7 @@ class TrayCaptureWorker(QObject):
     finished = pyqtSignal(bool, str)
 
     def run(self):
+        from live_text_ocr.core.barcode import detect_barcodes
         config = load_config()
         lang = config.get("ocr_language", "eng")
         psm = config.get("psm_mode", 6)
@@ -83,6 +84,22 @@ class TrayCaptureWorker(QObject):
             image = capture_selected_region()
             if not image:
                 self.finished.emit(True, "")
+                return
+
+            # Check for QR / Barcodes first
+            barcodes = detect_barcodes(image)
+            if barcodes:
+                first_code = barcodes[0]
+                payload = first_code.data
+                copy_to_clipboard(payload)
+                log_history_entry(payload)
+
+                notify_cfg = config.get("notifications", {})
+                if notify_cfg.get("enabled", True):
+                    icon_prefix = "📱" if "QR" in first_code.type_name.upper() else "📊"
+                    notify_success(f"{icon_prefix} [{first_code.type_name}] {payload}")
+
+                self.finished.emit(True, payload)
                 return
 
             preprocess_cfg = config.get("preprocess", {})
@@ -103,7 +120,7 @@ class TrayCaptureWorker(QObject):
                 text = engine.extract_text(image, lang=lang, psm=3)
 
             if not text:
-                notify_error("No text detected in selected region.")
+                notify_error("No text or barcode detected in selected region.")
                 self.finished.emit(True, "")
                 return
 
@@ -132,6 +149,7 @@ class TrayLiveWorker(QObject):
 
     def run(self):
         from live_text_ocr.core.capture import capture_fullscreen
+        from live_text_ocr.core.barcode import detect_barcodes
         config = load_config()
         lang = config.get("ocr_language", "eng")
         psm = config.get("psm_mode", 3)
@@ -143,6 +161,8 @@ class TrayLiveWorker(QObject):
                 return
             engine = TesseractEngine(default_lang=lang)
             layout = engine.extract_layout(screenshot, lang=lang, psm=psm)
+            barcodes = detect_barcodes(screenshot)
+            layout["barcodes"] = [b.to_dict() for b in barcodes]
             self.finished.emit(screenshot, layout)
         except Exception as e:
             self.error.emit(str(e))

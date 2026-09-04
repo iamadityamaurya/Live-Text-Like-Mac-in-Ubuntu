@@ -95,8 +95,12 @@ live-text-ocr live
 # Start the top-panel tray indicator daemon (default)
 live-text-ocr tray
 
-# Trigger an immediate interactive region crop capture
+# Trigger an immediate interactive region crop capture (auto-detects text & QR/barcodes)
 live-text-ocr capture
+
+# Scan & decode QR codes or Barcodes directly from screen or file
+live-text-ocr qr
+live-text-ocr qr --file /path/to/barcode.png
 
 # View recent OCR history in terminal
 live-text-ocr history

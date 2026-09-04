@@ -6,7 +6,8 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 from live_text_ocr.config import load_config, save_config, get_tessdata_dir
-from live_text_ocr.core.capture import capture_selected_region, CaptureCancelled
+from live_text_ocr.core.barcode import detect_barcodes
+from live_text_ocr.core.capture import capture_selected_region, capture_fullscreen, CaptureCancelled
 from live_text_ocr.core.clipboard import copy_to_clipboard
 from live_text_ocr.core.history import get_history, clear_history, log_history_entry
 from live_text_ocr.core.notify import notify_success, notify_error
@@ -17,7 +18,7 @@ from live_text_ocr.keybindings import register_gnome_shortcut
 
 
 def cmd_capture(args: argparse.Namespace) -> int:
-    """Perform one interactive screen capture and OCR."""
+    """Perform one interactive screen capture, detecting QR/Barcodes or running OCR."""
     config = load_config()
     lang = args.lang or config.get("ocr_language", "eng")
     psm = args.psm or config.get("psm_mode", 6)
@@ -28,7 +29,22 @@ def cmd_capture(args: argparse.Namespace) -> int:
         if not image:
             return 0
 
-        # 2. Preprocess image
+        # 2. Check for QR Code / Barcode first
+        barcodes = detect_barcodes(image)
+        if barcodes:
+            first_code = barcodes[0]
+            payload = first_code.data
+            copy_to_clipboard(payload)
+            log_history_entry(payload)
+
+            if config.get("notifications", {}).get("enabled", True):
+                icon_prefix = "📱" if "QR" in first_code.type_name.upper() else "📊"
+                notify_success(f"{icon_prefix} [{first_code.type_name}] {payload}")
+
+            print(f"Decoded {first_code.type_name} ({len(payload)} chars):\n{payload}")
+            return 0
+
+        # 3. Preprocess image for OCR
         preprocess_cfg = config.get("preprocess", {})
         if preprocess_cfg.get("enabled", True):
             processed_img = preprocess_image(
@@ -41,7 +57,7 @@ def cmd_capture(args: argparse.Namespace) -> int:
         else:
             processed_img = image
 
-        # 3. Perform OCR
+        # 4. Perform OCR
         engine = TesseractEngine(default_lang=lang)
         text = engine.extract_text(processed_img, lang=lang, psm=psm)
 
@@ -96,6 +112,52 @@ def cmd_live(args: argparse.Namespace) -> int:
     except Exception as e:
         notify_error(f"Live Text Error: {str(e)}")
         print(f"Error launching Live Text overlay: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_qr(args: argparse.Namespace) -> int:
+    """Scan and decode QR codes and Barcodes from screen or an image file."""
+    config = load_config()
+
+    try:
+        if args.file:
+            img_path = Path(args.file)
+            if not img_path.exists():
+                print(f"Error: File not found: {img_path}", file=sys.stderr)
+                return 1
+            image = Image.open(img_path)
+        else:
+            image = capture_selected_region()
+            if not image:
+                return 0
+
+        barcodes = detect_barcodes(image)
+        if not barcodes:
+            msg = "No QR code or Barcode detected."
+            if config.get("notifications", {}).get("enabled", True):
+                notify_error(msg)
+            print(msg)
+            return 1
+
+        print(f"Found {len(barcodes)} code(s):")
+        for i, code in enumerate(barcodes, 1):
+            print(f"[{i}] {code.type_name} ({code.category}): {code.data}")
+
+        # Copy first detected code to clipboard
+        payload = barcodes[0].data
+        copy_to_clipboard(payload)
+        log_history_entry(payload)
+
+        if config.get("notifications", {}).get("enabled", True):
+            icon_prefix = "📱" if "QR" in barcodes[0].type_name.upper() else "📊"
+            notify_success(f"{icon_prefix} [{barcodes[0].type_name}] {payload}")
+
+        return 0
+    except CaptureCancelled:
+        return 0
+    except Exception as e:
+        notify_error(f"Scan Error: {e}")
+        print(f"Error scanning codes: {e}", file=sys.stderr)
         return 1
 
 
@@ -226,6 +288,11 @@ def main() -> int:
     p_cap.add_argument("--lang", "-l", help="OCR language code (default from config or 'eng')")
     p_cap.add_argument("--psm", type=int, help="Page segmentation mode (default 6)")
     p_cap.set_defaults(func=cmd_capture)
+
+    # qr subcommand (barcode and QR code scanner)
+    p_qr = subparsers.add_parser("qr", aliases=["barcode", "code"], help="Scan and decode QR codes and Barcodes from screen or image")
+    p_qr.add_argument("--file", "-f", help="Image file path to scan")
+    p_qr.set_defaults(func=cmd_qr)
 
     # test subcommand
     p_test = subparsers.add_parser("test", help="Test OCR extraction on synthetic or existing image")

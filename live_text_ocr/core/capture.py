@@ -27,7 +27,7 @@ def capture_selected_region() -> Optional[Image.Image]:
     if session == "wayland":
         # On GNOME Wayland, portal is primary because slurp requires wlr-layer-shell
         try:
-            return _capture_portal()
+            return _capture_portal(interactive=True)
         except Exception as portal_err:
             # Fallback to slurp + grim (works on Sway / Hyprland / wlroots)
             try:
@@ -38,8 +38,62 @@ def capture_selected_region() -> Optional[Image.Image]:
         return _capture_x11()
 
 
-def _capture_portal() -> Optional[Image.Image]:
-    """Capture selected screen area on Wayland using standard XDG Desktop Portal."""
+def capture_fullscreen() -> Optional[Image.Image]:
+    """
+    Capture the entire screen image in memory for Live Text interactive overlay.
+    """
+    session = get_session_type()
+
+    if session == "wayland":
+        try:
+            return _capture_portal(interactive=False)
+        except Exception:
+            # Fallback to grim full screen if supported
+            try:
+                grim_bin = check_tool("grim")
+                if grim_bin:
+                    proc = subprocess.run([grim_bin, "-"], capture_output=True, check=True)
+                    return Image.open(io.BytesIO(proc.stdout)).copy()
+            except Exception:
+                pass
+            return _capture_qt_fallback()
+    else:
+        # X11 full screen capture
+        maim_bin = check_tool("maim")
+        scrot_bin = check_tool("scrot")
+        if maim_bin:
+            proc = subprocess.run([maim_bin, "-u"], capture_output=True, check=False)
+            if proc.returncode == 0:
+                return Image.open(io.BytesIO(proc.stdout)).copy()
+        if scrot_bin:
+            proc = subprocess.run([scrot_bin, "-o", "/dev/stdout"], capture_output=True, check=False)
+            if proc.returncode == 0:
+                return Image.open(io.BytesIO(proc.stdout)).copy()
+        return _capture_qt_fallback()
+
+
+def _capture_qt_fallback() -> Optional[Image.Image]:
+    """Fallback full screen capture using PyQt6 screen grab."""
+    try:
+        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtGui import QGuiApplication
+        from PyQt6.QtCore import QBuffer, QIODevice
+        
+        app = QApplication.instance() or QApplication([])
+        screen = QGuiApplication.primaryScreen()
+        if not screen:
+            return None
+        pixmap = screen.grabWindow(0)
+        buffer = QBuffer()
+        buffer.open(QIODevice.OpenModeFlag.ReadWrite)
+        pixmap.save(buffer, "PNG")
+        return Image.open(io.BytesIO(buffer.data().data())).copy()
+    except Exception as e:
+        raise RuntimeError(f"Screen capture failed: {e}")
+
+
+def _capture_portal(interactive: bool = True) -> Optional[Image.Image]:
+    """Capture screen area on Wayland using standard XDG Desktop Portal."""
     try:
         import gi
         gi.require_version("Gio", "2.0")
@@ -90,7 +144,7 @@ def _capture_portal() -> Optional[Image.Image]:
 
         options = {
             "handle_token": GLib.Variant("s", token),
-            "interactive": GLib.Variant("b", True),
+            "interactive": GLib.Variant("b", interactive),
         }
 
         proxy.call_sync(

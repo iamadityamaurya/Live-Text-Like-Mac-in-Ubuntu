@@ -84,6 +84,21 @@ def cmd_capture(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_live(args: argparse.Namespace) -> int:
+    """Launch interactive macOS-style Live Text overlay on screen."""
+    config = load_config()
+    lang = args.lang or config.get("ocr_language", "eng")
+    psm = args.psm or 3
+
+    try:
+        from live_text_ocr.ui.overlay import launch_live_overlay
+        return launch_live_overlay(lang=lang, psm=psm) or 0
+    except Exception as e:
+        notify_error(f"Live Text Error: {str(e)}")
+        print(f"Error launching Live Text overlay: {e}", file=sys.stderr)
+        return 1
+
+
 def cmd_test(args: argparse.Namespace) -> int:
     """Run an OCR test on a generated synthetic image or a given image file."""
     config = load_config()
@@ -199,6 +214,12 @@ def main() -> int:
     # tray subcommand (top panel icon)
     p_tray = subparsers.add_parser("tray", aliases=["panel", "indicator"], help="Launch Ubuntu top-panel tray indicator")
     p_tray.set_defaults(func=cmd_tray)
+
+    # live subcommand (interactive overlay)
+    p_live = subparsers.add_parser("live", aliases=["overlay", "interactive"], help="Launch full-screen macOS-style Live Text interactive overlay")
+    p_live.add_argument("--lang", "-l", help="OCR language code (default 'eng')")
+    p_live.add_argument("--psm", type=int, default=3, help="Page segmentation mode (default 3: fully automatic layout)")
+    p_live.set_defaults(func=cmd_live)
 
     # capture subcommand
     p_cap = subparsers.add_parser("capture", help="Trigger region selection and OCR to clipboard")

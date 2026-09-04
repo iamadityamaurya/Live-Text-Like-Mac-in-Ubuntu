@@ -119,6 +119,38 @@ class TesseractEngine:
         self.lib.TessBaseAPIEnd.restype = None
         self.lib.TessBaseAPIEnd.argtypes = [ctypes.c_void_p]
 
+        # Layout analysis / ResultIterator prototypes
+        self.lib.TessBaseAPIRecognize.restype = ctypes.c_int
+        self.lib.TessBaseAPIRecognize.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+
+        self.lib.TessBaseAPIGetIterator.restype = ctypes.c_void_p
+        self.lib.TessBaseAPIGetIterator.argtypes = [ctypes.c_void_p]
+
+        self.lib.TessResultIteratorGetUTF8Text.restype = ctypes.c_void_p
+        self.lib.TessResultIteratorGetUTF8Text.argtypes = [ctypes.c_void_p, ctypes.c_int]
+
+        self.lib.TessPageIteratorBoundingBox.restype = ctypes.c_int
+        self.lib.TessPageIteratorBoundingBox.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_int),
+            ctypes.POINTER(ctypes.c_int),
+            ctypes.POINTER(ctypes.c_int),
+            ctypes.POINTER(ctypes.c_int),
+        ]
+
+        self.lib.TessResultIteratorConfidence.restype = ctypes.c_float
+        self.lib.TessResultIteratorConfidence.argtypes = [ctypes.c_void_p, ctypes.c_int]
+
+        self.lib.TessPageIteratorNext.restype = ctypes.c_int
+        self.lib.TessPageIteratorNext.argtypes = [ctypes.c_void_p, ctypes.c_int]
+
+        self.lib.TessPageIteratorIsAtBeginningOf.restype = ctypes.c_int
+        self.lib.TessPageIteratorIsAtBeginningOf.argtypes = [ctypes.c_void_p, ctypes.c_int]
+
+        self.lib.TessPageIteratorDelete.restype = None
+        self.lib.TessPageIteratorDelete.argtypes = [ctypes.c_void_p]
+
     def extract_text(
         self,
         image: Image.Image,
@@ -126,7 +158,7 @@ class TesseractEngine:
         psm: int = 6,
     ) -> str:
         """
-        Extract text from a PIL Image instance.
+        Extract plain text from a PIL Image instance.
         
         :param image: PIL Image object (RGB, L, etc.)
         :param lang: OCR language code ('eng', 'fra', 'deu', etc.)
@@ -181,15 +213,144 @@ class TesseractEngine:
             self.lib.TessBaseAPIEnd(api)
             self.lib.TessBaseAPIDelete(api)
 
+    def extract_layout(
+        self,
+        image: Image.Image,
+        lang: Optional[str] = None,
+        psm: int = 3,
+        min_conf: float = 20.0,
+    ) -> dict:
+        """
+        Extract detailed word and line bounding boxes for interactive Live Text overlay.
+        
+        Returns a dictionary containing:
+          - 'words': list of dicts: {'text', 'box': (x, y, w, h), 'conf', 'line_idx', 'block_idx'}
+          - 'lines': list of dicts: {'text', 'box': (x, y, w, h), 'line_idx', 'block_idx'}
+          - 'full_text': full recognized string
+        """
+        target_lang = lang or self.default_lang
+        tessdata_path = ensure_language_data(target_lang)
+
+        api = self.lib.TessBaseAPICreate()
+        if not api:
+            raise RuntimeError("Failed to create TessBaseAPI instance")
+
+        try:
+            init_res = self.lib.TessBaseAPIInit3(
+                api,
+                str(tessdata_path).encode("utf-8"),
+                target_lang.encode("utf-8"),
+            )
+            if init_res != 0:
+                raise RuntimeError(
+                    f"TessBaseAPIInit3 failed with code {init_res} for language '{target_lang}' and path '{tessdata_path}'"
+                )
+
+            self.lib.TessBaseAPISetPageSegMode(api, psm)
+
+            gray_img = image.convert("L")
+            img_bytes = gray_img.tobytes("raw", "L")
+            width, height = gray_img.size
+
+            self.lib.TessBaseAPISetImage(
+                api,
+                img_bytes,
+                width,
+                height,
+                1,
+                width,
+            )
+
+            self.lib.TessBaseAPIRecognize(api, None)
+            it = self.lib.TessBaseAPIGetIterator(api)
+
+            RIL_BLOCK = 0
+            RIL_TEXTLINE = 2
+            RIL_WORD = 3
+
+            words = []
+            lines = []
+            current_line_idx = -1
+            current_block_idx = -1
+
+            if it:
+                try:
+                    while True:
+                        if self.lib.TessPageIteratorIsAtBeginningOf(it, RIL_BLOCK):
+                            current_block_idx += 1
+
+                        if self.lib.TessPageIteratorIsAtBeginningOf(it, RIL_TEXTLINE):
+                            current_line_idx += 1
+                            line_ptr = self.lib.TessResultIteratorGetUTF8Text(it, RIL_TEXTLINE)
+                            if line_ptr:
+                                try:
+                                    raw_l = ctypes.cast(line_ptr, ctypes.c_char_p).value
+                                    l_text = raw_l.decode("utf-8", errors="replace").strip() if raw_l else ""
+                                finally:
+                                    self.lib.TessDeleteText(line_ptr)
+
+                                ll, lt, lr, lb = ctypes.c_int(), ctypes.c_int(), ctypes.c_int(), ctypes.c_int()
+                                self.lib.TessPageIteratorBoundingBox(
+                                    it, RIL_TEXTLINE,
+                                    ctypes.byref(ll), ctypes.byref(lt), ctypes.byref(lr), ctypes.byref(lb)
+                                )
+                                if l_text:
+                                    lines.append({
+                                        "line_idx": current_line_idx,
+                                        "text": l_text,
+                                        "box": (ll.value, lt.value, lr.value - ll.value, lb.value - lt.value),
+                                        "block_idx": current_block_idx,
+                                    })
+
+                        txt_ptr = self.lib.TessResultIteratorGetUTF8Text(it, RIL_WORD)
+                        if txt_ptr:
+                            try:
+                                raw_w = ctypes.cast(txt_ptr, ctypes.c_char_p).value
+                                word = raw_w.decode("utf-8", errors="replace").strip() if raw_w else ""
+                            finally:
+                                self.lib.TessDeleteText(txt_ptr)
+
+                            if word:
+                                wl, wt, wr, wb = ctypes.c_int(), ctypes.c_int(), ctypes.c_int(), ctypes.c_int()
+                                self.lib.TessPageIteratorBoundingBox(
+                                    it, RIL_WORD,
+                                    ctypes.byref(wl), ctypes.byref(wt), ctypes.byref(wr), ctypes.byref(wb)
+                                )
+                                conf = float(self.lib.TessResultIteratorConfidence(it, RIL_WORD))
+                                if conf >= min_conf:
+                                    words.append({
+                                        "text": word,
+                                        "box": (wl.value, wt.value, wr.value - wl.value, wb.value - wt.value),
+                                        "conf": conf,
+                                        "line_idx": current_line_idx,
+                                        "block_idx": current_block_idx,
+                                    })
+
+                        if not self.lib.TessPageIteratorNext(it, RIL_WORD):
+                            break
+                finally:
+                    self.lib.TessPageIteratorDelete(it)
+
+            full_text = "\n".join(l["text"] for l in lines) if lines else " ".join(w["text"] for w in words)
+            return {
+                "words": words,
+                "lines": lines,
+                "full_text": full_text.strip(),
+                "image_size": (width, height),
+            }
+        finally:
+            self.lib.TessBaseAPIEnd(api)
+            self.lib.TessBaseAPIDelete(api)
+
     @staticmethod
     def clean_text(text: str) -> str:
         """Remove trailing spaces, null characters, and normalize line breaks."""
         if not text:
             return ""
         lines = [line.strip() for line in text.splitlines()]
-        # Strip trailing and leading empty lines
         while lines and not lines[0]:
             lines.pop(0)
         while lines and not lines[-1]:
             lines.pop()
         return "\n".join(lines).strip()
+

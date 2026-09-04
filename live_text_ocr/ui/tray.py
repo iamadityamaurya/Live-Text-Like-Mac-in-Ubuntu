@@ -126,11 +126,38 @@ class TrayCaptureWorker(QObject):
             self.finished.emit(False, str(e))
 
 
+class TrayLiveWorker(QObject):
+    finished = pyqtSignal(object, object)
+    error = pyqtSignal(str)
+
+    def run(self):
+        from live_text_ocr.core.capture import capture_fullscreen
+        config = load_config()
+        lang = config.get("ocr_language", "eng")
+        psm = config.get("psm_mode", 3)
+
+        try:
+            time.sleep(0.15)
+            screenshot = capture_fullscreen()
+            if not screenshot:
+                return
+            engine = TesseractEngine(default_lang=lang)
+            layout = engine.extract_layout(screenshot, lang=lang, psm=psm)
+            self.finished.emit(screenshot, layout)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
 class LiveTextTrayIcon(QSystemTrayIcon):
+    open_overlay_signal = pyqtSignal(object, object)
+
     def __init__(self, parent=None):
         icon = create_tray_icon()
         super().__init__(icon, parent)
         self.setToolTip("Live Text OCR — Click to capture screen text")
+        self.overlay_window = None
+        self.open_overlay_signal.connect(self._show_overlay_window)
+
         self.menu = QMenu()
         self._apply_menu_style()
         self.menu.aboutToShow.connect(self._rebuild_menu)
@@ -170,15 +197,20 @@ class LiveTextTrayIcon(QSystemTrayIcon):
         """Rebuild the native top-panel dropdown menu."""
         self.menu.clear()
 
-        # 1. Capture Action (Top)
-        action_capture = QAction("⛶   Capture Text Selection", self)
-        action_capture.setFont(QFont("Ubuntu", 10, QFont.Weight.Bold))
+        # 1. Interactive Live Text Overlay (Primary macOS feature)
+        action_live = QAction("🎯   Live Text Interactive Overlay", self)
+        action_live.setFont(QFont("Ubuntu", 10, QFont.Weight.Bold))
+        action_live.triggered.connect(self.trigger_live)
+        self.menu.addAction(action_live)
+
+        # 2. Region Crop Capture Action
+        action_capture = QAction("⛶   Capture Region Selection", self)
         action_capture.triggered.connect(self.trigger_capture)
         self.menu.addAction(action_capture)
 
         self.menu.addSeparator()
 
-        # 2. History Items (with direct Pin & Delete sub-actions)
+        # 3. History Items (with direct Pin & Delete sub-actions)
         history = get_history()
         if not history:
             no_action = self.menu.addAction("    (No history clips yet)")
@@ -215,7 +247,7 @@ class LiveTextTrayIcon(QSystemTrayIcon):
 
         self.menu.addSeparator()
 
-        # 3. Quit Button (Bottom)
+        # 4. Quit Button (Bottom)
         action_quit = QAction("✕   Quit Live Text", self)
         action_quit.triggered.connect(QApplication.quit)
         self.menu.addAction(action_quit)
@@ -242,10 +274,23 @@ class LiveTextTrayIcon(QSystemTrayIcon):
             QSystemTrayIcon.ActivationReason.Trigger,
             QSystemTrayIcon.ActivationReason.DoubleClick,
         ):
-            self.trigger_capture()
+            self.trigger_live()
+
+    def trigger_live(self):
+        """Run Live Text overlay capture in background and show interactive UI."""
+        self.live_worker = TrayLiveWorker()
+        self.live_worker.finished.connect(lambda ss, lay: self.open_overlay_signal.emit(ss, lay))
+        self.live_worker.error.connect(lambda err: notify_error(f"Live Text Error: {err}"))
+        self.live_thread = threading.Thread(target=self.live_worker.run, daemon=True)
+        self.live_thread.start()
+
+    def _show_overlay_window(self, screenshot, layout):
+        from live_text_ocr.ui.overlay import LiveTextOverlayWindow
+        self.overlay_window = LiveTextOverlayWindow(screenshot, layout)
+        self.overlay_window.show()
 
     def trigger_capture(self):
-        """Run OCR capture in background thread."""
+        """Run OCR region crop capture in background thread."""
         self.worker = TrayCaptureWorker()
         self.thread = threading.Thread(target=self.worker.run, daemon=True)
         self.thread.start()

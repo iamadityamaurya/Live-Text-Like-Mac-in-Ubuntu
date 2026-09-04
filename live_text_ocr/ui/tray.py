@@ -251,10 +251,26 @@ class LiveTextTrayIcon(QSystemTrayIcon):
         self.thread.start()
 
 
+from PyQt6.QtNetwork import QLocalServer, QLocalSocket
+
+
 def start_tray():
-    """Start the top panel tray indicator daemon."""
+    """Start the top panel tray indicator daemon with single-instance enforcement."""
     app = QApplication.instance() or QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
+
+    # Enforce single instance to prevent duplicate tray icons
+    socket_name = "live-text-ocr-single-instance-lock"
+    socket = QLocalSocket()
+    socket.connectToServer(socket_name)
+    if socket.waitForConnected(400):
+        print("Live Text OCR is already running in your top panel.")
+        sys.exit(0)
+
+    # Clean up any stale socket from previous crash and listen
+    server = QLocalServer()
+    server.removeServer(socket_name)
+    server.listen(socket_name)
 
     tray = LiveTextTrayIcon()
     tray.show()

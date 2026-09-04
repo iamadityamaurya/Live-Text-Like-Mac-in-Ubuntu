@@ -43,7 +43,30 @@ chmod +x "$APP_DIR/live-text-ocr.desktop"
 AUTOSTART_DIR="$HOME/.config/autostart"
 mkdir -p "$AUTOSTART_DIR"
 cp "$APP_DIR/live-text-ocr.desktop" "$AUTOSTART_DIR/live-text-ocr.desktop"
-echo "✅ Autostart & Desktop entry created"
+
+# Create and enable systemd user service for background persistence
+SYSTEMD_DIR="$HOME/.config/systemd/user"
+mkdir -p "$SYSTEMD_DIR"
+cat <<EOF > "$SYSTEMD_DIR/live-text-ocr.service"
+[Unit]
+Description=Live Text OCR Tray Indicator
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=$TARGET_BIN tray
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target
+EOF
+
+systemctl --user daemon-reload || true
+systemctl --user enable live-text-ocr.service || true
+systemctl --user restart live-text-ocr.service || true
+echo "✅ Autostart & systemd background service configured"
 
 # 4. Download / verify Tesseract language model
 echo "Checking language models..."

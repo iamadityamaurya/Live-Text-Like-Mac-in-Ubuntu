@@ -23,7 +23,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "expire_time_ms": 3000,
     },
     "history": {
-        "max_items": 50,
+        "enabled": True,
+        "max_entries": 50,
         "persist": True,
     },
     "overlay": {

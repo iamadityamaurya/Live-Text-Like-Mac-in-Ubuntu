@@ -2,7 +2,7 @@
 
 import os
 import shutil
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 
 def get_session_type() -> str:
@@ -24,7 +24,7 @@ def check_tool(name: str) -> Optional[str]:
     return shutil.which(name)
 
 
-def inspect_environment() -> Dict[str, any]:
+def inspect_environment() -> Dict[str, Any]:
     """Inspect the desktop environment and available tools."""
     session = get_session_type()
     tools = {
@@ -36,6 +36,7 @@ def inspect_environment() -> Dict[str, any]:
         "wl-paste": check_tool("wl-paste"),
         "xclip": check_tool("xclip"),
         "xsel": check_tool("xsel"),
+        "gnome-screenshot": check_tool("gnome-screenshot"),
         "notify-send": check_tool("notify-send"),
     }
     return {

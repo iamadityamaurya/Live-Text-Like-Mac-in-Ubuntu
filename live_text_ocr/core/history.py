@@ -19,7 +19,8 @@ def log_history_entry(text: str) -> None:
     if not config.get("history", {}).get("enabled", True):
         return
 
-    max_entries = config.get("history", {}).get("max_entries", 50)
+    hist_cfg = config.get("history", {})
+    max_entries = hist_cfg.get("max_entries", hist_cfg.get("max_items", 50))
     raw_history = _read_raw_history()
 
     # Don't add consecutive identical duplicate entries

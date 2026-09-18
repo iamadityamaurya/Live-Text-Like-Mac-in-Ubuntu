@@ -30,7 +30,7 @@ Before running the installer, ensure standard system dependencies are installed 
 
 ```bash
 sudo apt update
-sudo apt install -y libtesseract5 python3-pil python3-pyqt6 grim slurp wl-clipboard libnotify-bin
+sudo apt install -y libtesseract5 libzbar0 python3-pil python3-pyqt6 grim slurp wl-clipboard libnotify-bin
 ```
 
 ---

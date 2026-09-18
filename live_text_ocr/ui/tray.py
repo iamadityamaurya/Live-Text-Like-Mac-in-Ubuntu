@@ -6,6 +6,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
+from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 from PyQt6.QtGui import (
     QAction,
     QColor,
@@ -314,9 +315,6 @@ class LiveTextTrayIcon(QSystemTrayIcon):
         self.worker = TrayCaptureWorker()
         self.thread = threading.Thread(target=self.worker.run, daemon=True)
         self.thread.start()
-
-
-from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
 
 def start_tray():

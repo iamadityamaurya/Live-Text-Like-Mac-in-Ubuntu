@@ -24,10 +24,13 @@ def get_gnome_custom_bindings() -> list:
             check=True,
         )
         val = res.stdout.strip()
-        if val == "@as []" or not val:
+        if not val or val == "@as []" or val == "[]":
             return []
+        if val.startswith("@as "):
+            val = val[4:].strip()
         # Parse gsettings list format
-        return ast.literal_eval(val)
+        parsed = ast.literal_eval(val)
+        return parsed if isinstance(parsed, list) else []
     except Exception:
         return []
 

@@ -45,18 +45,47 @@ def capture_fullscreen() -> Optional[Image.Image]:
     session = get_session_type()
 
     if session == "wayland":
+        # 1. Try XDG Desktop Portal non-interactive
         try:
             return _capture_portal(interactive=False)
         except Exception:
-            # Fallback to grim full screen if supported
+            pass
+
+        # 2. Try gnome-screenshot CLI (works directly on GNOME Wayland)
+        gnome_screenshot = check_tool("gnome-screenshot")
+        if gnome_screenshot:
             try:
-                grim_bin = check_tool("grim")
-                if grim_bin:
-                    proc = subprocess.run([grim_bin, "-"], capture_output=True, check=True)
-                    return Image.open(io.BytesIO(proc.stdout)).copy()
+                import tempfile
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                    tmp_path = tmp.name
+                proc = subprocess.run([gnome_screenshot, "-f", tmp_path], capture_output=True, check=False)
+                if proc.returncode == 0 and os.path.exists(tmp_path):
+                    with open(tmp_path, "rb") as f:
+                        img = Image.open(io.BytesIO(f.read())).copy()
+                    try:
+                        os.remove(tmp_path)
+                    except OSError:
+                        pass
+                    return img
             except Exception:
                 pass
-            return _capture_qt_fallback()
+
+        # 3. Fallback to grim full screen if supported (wlroots: Sway, Hyprland)
+        try:
+            grim_bin = check_tool("grim")
+            if grim_bin:
+                proc = subprocess.run([grim_bin, "-"], capture_output=True, check=True)
+                return Image.open(io.BytesIO(proc.stdout)).copy()
+        except Exception:
+            pass
+
+        # 4. Fallback to interactive portal capture
+        try:
+            return _capture_portal(interactive=True)
+        except Exception:
+            pass
+
+        return _capture_qt_fallback()
     else:
         # X11 full screen capture
         maim_bin = check_tool("maim")

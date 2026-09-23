@@ -120,7 +120,7 @@ def register_gnome_shortcut(
     name: str = "Live Text OCR",
 ) -> Tuple[bool, str]:
     """Register or update a GNOME global shortcut."""
-    default_binding = "<Ctrl><Shift>c" if name == "Live Text OCR" else "<Ctrl><Shift>l"
+    default_binding = "<Super><Shift>c" if name == "Live Text OCR" else "<Super><Shift>o"
     binding = binding or default_binding
     ok = register_gnome_shortcut_by_name(name, command_path, binding)
     if ok:

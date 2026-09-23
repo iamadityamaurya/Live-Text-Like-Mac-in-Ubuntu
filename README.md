@@ -16,7 +16,7 @@ A native, lightweight macOS Live Text–style OCR utility designed for Ubuntu (W
 * **Direct History Access**: View recent text clips directly in the top-bar dropdown with one-click copy.
 * **Pin & Delete Controls**: Pin favorite/frequent clips to the top or delete individual entries.
 * **Floating Glassmorphic Action Bar**: Copy selection (`Enter` / `Ctrl+C`), Select All (`Ctrl+A`), Google Search, Translate, or dismiss (`Esc`).
-* **Global Keyboard Shortcuts**: Press `Ctrl + Shift + C` to capture a region or `Ctrl + Shift + L` to launch the interactive overlay anywhere on your desktop.
+* **Global Keyboard Shortcuts**: Press `Super + Shift + C` (Logo+Shift+C) to capture a region or `Super + Shift + O` (Logo+Shift+O) to launch the interactive overlay anywhere on your desktop. The installer configures these via `gsettings` on GNOME; Niri users can add the binds to `~/.config/niri/config.kdl` (see Niri section below).
 * **Video Frame Preprocessing**: Auto-enhances contrast and detects dark slides/videos (auto-inverting them for near-100% Tesseract OCR accuracy).
 * **Zero Disk Writes**: In-memory pixel capture and streaming directly into the local OCR engine without saving temporary screenshots.
 * **No Root Required**: Interacts directly with Ubuntu's native `libtesseract.so.5` C-API without requiring `sudo` to run or download language packs.
@@ -48,7 +48,7 @@ cd copy_paste
 ### What the Installer Does Automatically:
 1. **Installs Launcher**: Creates the executable wrapper at `~/.local/bin/live-text-ocr`.
 2. **Downloads OCR Model**: Downloads and caches `eng.traineddata` in `~/.config/live-text-ocr/tessdata/`.
-3. **Binds Global Shortcuts**: Registers `Ctrl + Shift + C` for region capture and `Ctrl + Shift + L` for interactive overlay in GNOME Settings via `gsettings`.
+3. **Binds Global Shortcuts**: Registers `Super + Shift + C` for region capture and `Super + Shift + O` for interactive overlay in GNOME Settings via `gsettings`. Niri users should add the binds manually.
 4. **Creates Desktop Entry**: Adds `Live Text OCR` to your Ubuntu Applications menu.
 5. **Configures Autostart**: Installs `~/.config/autostart/live-text-ocr.desktop` for graphical login.
 6. **Enables systemd Service**: Configures and starts `live-text-ocr.service` via `systemctl --user` so it runs continuously in the background.
@@ -80,7 +80,7 @@ cd copy_paste
   * **`✕ Quit Live Text`**: Close the indicator.
 
 ### 3. Global Keyboard Shortcut
-* Press **`Ctrl + Shift + C`** to select a region, or **`Ctrl + Shift + L`** to open the full-screen overlay.
+* Press **`Super + Shift + C`** to select a region, or **`Super + Shift + O`** to open the full-screen overlay.
 * Drag a box or click words over any text on your screen.
 * Press **`Ctrl + V`** anywhere to paste.
 
@@ -153,8 +153,8 @@ Settings are saved in `~/.config/live-text-ocr/config.json`:
 
 ```json
 {
-  "shortcut_capture": "<Ctrl><Shift>c",
-  "shortcut_overlay": "<Ctrl><Shift>l",
+  "shortcut_capture": "<Super><Shift>c",
+  "shortcut_overlay": "<Super><Shift>o",
   "ocr_language": "eng",
   "psm_mode": 6,
   "preprocess": {
@@ -201,6 +201,19 @@ live_text_ocr/
     ├── notify.py        # Desktop notification dispatcher (notify-send)
     └── history.py       # History storage with pin/delete management
 ```
+
+---
+
+## 🪟 Niri (Wayland Compositor)
+
+If you use **Niri** instead of GNOME, the installer cannot bind global shortcuts for you. Add the following lines inside your `binds {}` block (usually in `~/.config/niri/config.kdl` or `~/.config/niri/dms/binds.kdl`):
+
+```kdl
+Mod+Shift+C repeat=false hotkey-overlay-title="Live Text: Capture Region" { spawn "/usr/bin/live-text-ocr" "capture"; }
+Mod+Shift+O repeat=false hotkey-overlay-title="Live Text: Overlay" { spawn "/usr/bin/live-text-ocr" "live"; }
+```
+
+Then reload your Niri config (`niri msg action reload-config`) or log out and back in.
 
 ---
 

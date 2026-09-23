@@ -12,7 +12,7 @@ const DEMO_LINES = [
 
 const FEATURES = [
   'Full-screen interactive overlay with hover and drag selection.',
-  'Global shortcuts: Ctrl+Shift+C for capture, Ctrl+Shift+L for overlay.',
+  'Global shortcuts: Super+Shift+C for capture, Super+Shift+O for overlay.',
   'Local OCR with libtesseract. Nothing is uploaded.',
   'QR and barcode decoding with libzbar.',
   'Clipboard history with pin and delete.',
@@ -344,7 +344,7 @@ function App() {
                 instantly. Local OCR. No cloud. No root.
               </p>
               <div className="shortcut">
-                <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> capture <span className="shortcut-div">·</span> <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>L</kbd> overlay
+                <kbd>Super</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> capture <span className="shortcut-div">·</span> <kbd>Super</kbd> + <kbd>Shift</kbd> + <kbd>O</kbd> overlay
               </div>
               <div className="hero-actions">
                 <a href="#install" className="btn btn-primary">

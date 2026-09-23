@@ -9,8 +9,8 @@ from typing import Any, Dict
 DEFAULT_CONFIG: Dict[str, Any] = {
     "ocr_language": "eng",
     "psm_mode": 6,
-    "shortcut_capture": "<Ctrl><Shift>c",
-    "shortcut_overlay": "<Ctrl><Shift>l",
+    "shortcut_capture": "<Super><Shift>c",
+    "shortcut_overlay": "<Super><Shift>o",
     "theme": "dark",
     "preprocess": {
         "enabled": True,

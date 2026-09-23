@@ -240,11 +240,11 @@ def cmd_setup_shortcut(args: argparse.Namespace) -> int:
         exec_path = f"live-text-ocr {command}"
 
     if name == "Live Text OCR" and not binding:
-        binding = config.get("shortcut_capture", "<Ctrl><Shift>c")
+        binding = config.get("shortcut_capture", "<Super><Shift>c")
     elif name == "Live Text OCR Overlay" and not binding:
-        binding = config.get("shortcut_overlay", "<Ctrl><Shift>l")
+        binding = config.get("shortcut_overlay", "<Super><Shift>o")
     elif not binding:
-        binding = "<Ctrl><Shift>c"
+        binding = "<Super><Shift>c"
 
     success, msg = register_gnome_shortcut(exec_path, binding=binding, name=name)
     if success:
@@ -330,7 +330,7 @@ def main() -> int:
     p_sc = subparsers.add_parser("setup-shortcut", help="Register GNOME global shortcut")
     p_sc.add_argument("--name", default="Live Text OCR", help="Shortcut entry name (default: Live Text OCR)")
     p_sc.add_argument("--subcmd", default="capture", help="Subcommand to run: capture or live (default: capture)")
-    p_sc.add_argument("--binding", default=None, help="Keybinding (e.g. <Ctrl><Shift>c, <Super><Shift>o)")
+    p_sc.add_argument("--binding", default=None, help="Keybinding (e.g. <Super><Shift>c, <Super><Shift>o)")
     p_sc.set_defaults(func=cmd_setup_shortcut)
 
     # info subcommand

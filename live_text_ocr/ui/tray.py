@@ -285,8 +285,8 @@ class LiveTextTrayIcon(QSystemTrayIcon):
         settings_menu = self.menu.addMenu("⚙   Settings")
 
         config = load_config()
-        capture_binding = get_current_shortcut("Live Text OCR") or config.get("shortcut_capture", "<F8>")
-        overlay_binding = get_current_shortcut("Live Text OCR Overlay") or config.get("shortcut_overlay", "<F9>")
+        capture_binding = get_current_shortcut("Live Text OCR") or config.get("shortcut_capture", "<Super><Shift>c")
+        overlay_binding = get_current_shortcut("Live Text OCR Overlay") or config.get("shortcut_overlay", "<Super><Shift>o")
 
         act_capture = settings_menu.addAction(f"Capture shortcut: {binding_to_display(capture_binding)}")
         act_capture.triggered.connect(lambda: self._open_shortcut_dialog("capture"))
@@ -323,7 +323,7 @@ class LiveTextTrayIcon(QSystemTrayIcon):
         title_map = {"capture": "Capture Region", "overlay": "Interactive Overlay"}
         name_map = {"capture": "Live Text OCR", "overlay": "Live Text OCR Overlay"}
         command_map = {"capture": "capture", "overlay": "live"}
-        current = config.get(key, "<Ctrl><Shift>c" if mode == "capture" else "<Ctrl><Shift>l")
+        current = config.get(key, "<Super><Shift>c" if mode == "capture" else "<Super><Shift>o")
 
         dialog = QDialog()
         dialog.setWindowTitle(f"Live Text OCR — {title_map[mode]} Shortcut")
@@ -373,14 +373,14 @@ class LiveTextTrayIcon(QSystemTrayIcon):
         layout.setSpacing(14)
 
         info = QLabel(
-            "Format examples: &lt;F8&gt;, &lt;Super&gt;&lt;Shift&gt;o, &lt;Ctrl&gt;&lt;Alt&gt;t.\n"
+            "Format examples: &lt;Super&gt;&lt;Shift&gt;c, &lt;Super&gt;&lt;Shift&gt;o, &lt;Ctrl&gt;&lt;Alt&gt;t.\n"
             "Use modifier names: Super, Ctrl, Alt, Shift."
         )
         info.setWordWrap(True)
         layout.addWidget(info)
 
         input_field = QLineEdit(current)
-        input_field.setPlaceholderText("<Ctrl><Shift>c" if mode == "capture" else "<Ctrl><Shift>l")
+        input_field.setPlaceholderText("<Super><Shift>c" if mode == "capture" else "<Super><Shift>o")
         layout.addWidget(input_field)
 
         btn_row = QHBoxLayout()

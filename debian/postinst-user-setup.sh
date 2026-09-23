@@ -27,11 +27,11 @@ gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "$
 
 gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${BASE}/custom-live-text-ocr/ name 'Live Text OCR' || true
 gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${BASE}/custom-live-text-ocr/ command '/usr/bin/live-text-ocr capture' || true
-gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${BASE}/custom-live-text-ocr/ binding '<Ctrl><Shift>c' || true
+gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${BASE}/custom-live-text-ocr/ binding '<Super><Shift>c' || true
 
 gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${OVERLAY} name 'Live Text OCR Overlay' || true
 gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${OVERLAY} command '/usr/bin/live-text-ocr live' || true
-gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${OVERLAY} binding '<Ctrl><Shift>l' || true
+gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${OVERLAY} binding '<Super><Shift>o' || true
 
 systemctl --user daemon-reload || true
 systemctl --user enable live-text-ocr.service || true

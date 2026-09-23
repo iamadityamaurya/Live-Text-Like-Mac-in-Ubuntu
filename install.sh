@@ -77,14 +77,14 @@ from live_text_ocr.core.ocr_engine import ensure_language_data
 ensure_language_data('eng')
 "
 
-# 5. Register GNOME Global Shortcuts (F8 capture, F9 overlay)
-echo "Configuring GNOME global shortcuts (<Ctrl><Shift>c capture, <Ctrl><Shift>l overlay)..."
+# 5. Register GNOME Global Shortcuts (Super+Shift+C capture, Super+Shift+O overlay)
+echo "Configuring GNOME global shortcuts (<Super><Shift>c capture, <Super><Shift>o overlay)..."
 python3 -c "
 import sys
 sys.path.insert(0, '$SCRIPT_DIR')
 from live_text_ocr.keybindings import register_gnome_shortcut_by_name
-ok1 = register_gnome_shortcut_by_name('Live Text OCR', '$TARGET_BIN capture', '<Ctrl><Shift>c')
-ok2 = register_gnome_shortcut_by_name('Live Text OCR Overlay', '$TARGET_BIN live', '<Ctrl><Shift>l')
+ok1 = register_gnome_shortcut_by_name('Live Text OCR', '$TARGET_BIN capture', '<Super><Shift>c')
+ok2 = register_gnome_shortcut_by_name('Live Text OCR Overlay', '$TARGET_BIN live', '<Super><Shift>o')
 print('Capture shortcut:', 'ok' if ok1 else 'failed')
 if not ok1:
     import sys
@@ -97,4 +97,4 @@ if not ok2:
 
 echo ""
 echo "🎉 Installation complete!"
-echo "Press [Ctrl + Shift + C] to capture a region or [Ctrl + Shift + L] to open the overlay."
+echo "Press [Super + Shift + C] to capture a region or [Super + Shift + O] to open the overlay."

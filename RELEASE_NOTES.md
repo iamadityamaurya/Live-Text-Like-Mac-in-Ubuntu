@@ -7,7 +7,7 @@ First packaged release of **Live Text OCR for Ubuntu** — a native, lightweight
 - **`.deb` packages** for both `amd64` and `arm64`
 - **Interactive Live Text overlay** — full-screen word selection with hover, click, and drag marquee
 - **Top-panel tray indicator** with clipboard history, pin, and delete controls
-- **Global shortcuts** `Ctrl + Shift + C` for capture, `Ctrl + Shift + L` for overlay
+- **Global shortcuts** `Super + Shift + C` for capture, `Super + Shift + O` for overlay
 - **QR & barcode scanning** via `live-text-ocr qr`
 - **Local OCR** using `libtesseract5` via in-process `ctypes`
 - **Wayland and X11 support** with automatic capture backend selection
@@ -25,7 +25,7 @@ sudo apt install ./live-text-ocr_1.0.0-1_amd64.deb
 sudo apt install ./live-text-ocr_1.0.0-1_arm64.deb
 ```
 
-After install, the GNOME shortcuts `Ctrl + Shift + C` (capture) and `Ctrl + Shift + L` (overlay) are registered, autostart is enabled, and the systemd user service is ready.
+After install, the GNOME shortcuts `Super + Shift + C` (capture) and `Super + Shift + O` (overlay) are registered, autostart is enabled, and the systemd user service is ready.
 
 ## Quick start
 

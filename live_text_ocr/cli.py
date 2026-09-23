@@ -227,21 +227,33 @@ def cmd_download_lang(args: argparse.Namespace) -> int:
 
 
 def cmd_setup_shortcut(args: argparse.Namespace) -> int:
-    """Register the GNOME global shortcut."""
+    """Register a GNOME global shortcut (capture or overlay)."""
     config = load_config()
-    binding = args.binding or config.get("shortcut", "<Super><Shift>o")
-    exec_path = args.command or "live-text-ocr capture"
-    
-    # Check if live-text-ocr is in ~/.local/bin/
+    binding = args.binding
+    name = args.name
+    command = args.subcmd or "capture"
+
     local_bin = Path.home() / ".local/bin/live-text-ocr"
     if local_bin.exists():
-        exec_path = str(local_bin) + " capture"
+        exec_path = f"{local_bin} {command}"
+    else:
+        exec_path = f"live-text-ocr {command}"
 
-    success, msg = register_gnome_shortcut(exec_path, binding=binding)
+    if name == "Live Text OCR" and not binding:
+        binding = config.get("shortcut_capture", "<Ctrl><Shift>c")
+    elif name == "Live Text OCR Overlay" and not binding:
+        binding = config.get("shortcut_overlay", "<Ctrl><Shift>l")
+    elif not binding:
+        binding = "<Ctrl><Shift>c"
+
+    success, msg = register_gnome_shortcut(exec_path, binding=binding, name=name)
     if success:
-        config["shortcut"] = binding
+        if name == "Live Text OCR":
+            config["shortcut_capture"] = binding
+        elif name == "Live Text OCR Overlay":
+            config["shortcut_overlay"] = binding
         save_config(config)
-        print(f"✅ Shortcut {binding} registered to command: {exec_path}")
+        print(f"✅ {name} shortcut {binding} registered to command: {exec_path}")
         return 0
     else:
         print(f"❌ {msg}", file=sys.stderr)
@@ -316,8 +328,9 @@ def main() -> int:
 
     # setup-shortcut subcommand
     p_sc = subparsers.add_parser("setup-shortcut", help="Register GNOME global shortcut")
-    p_sc.add_argument("--binding", default="<Super><Shift>o", help="Keybinding (default: <Super><Shift>o)")
-    p_sc.add_argument("--command", help="Command to run on shortcut")
+    p_sc.add_argument("--name", default="Live Text OCR", help="Shortcut entry name (default: Live Text OCR)")
+    p_sc.add_argument("--subcmd", default="capture", help="Subcommand to run: capture or live (default: capture)")
+    p_sc.add_argument("--binding", default=None, help="Keybinding (e.g. <Ctrl><Shift>c, <Super><Shift>o)")
     p_sc.set_defaults(func=cmd_setup_shortcut)
 
     # info subcommand

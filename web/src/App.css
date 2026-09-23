@@ -110,6 +110,11 @@
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
 }
 
+.shortcut-div {
+  color: var(--text-muted);
+  margin: 0 6px;
+}
+
 .hero-actions {
   display: flex;
   gap: 12px;
@@ -479,12 +484,40 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 10px 12px 10px 14px;
   background: rgba(255, 255, 255, 0.02);
   border-bottom: 1px solid var(--border);
   font-size: 13px;
   font-weight: 700;
   color: var(--text-muted);
+  gap: 12px;
+}
+
+.install-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.install-tab {
+  padding: 5px 12px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--mono);
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.install-tab:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.install-tab.active {
+  background: var(--accent-soft);
+  border-color: var(--accent-glow);
+  color: var(--text-h);
 }
 
 .copy-btn {

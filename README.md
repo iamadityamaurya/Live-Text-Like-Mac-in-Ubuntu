@@ -16,7 +16,7 @@ A native, lightweight macOS Live Text–style OCR utility designed for Ubuntu (W
 * **Direct History Access**: View recent text clips directly in the top-bar dropdown with one-click copy.
 * **Pin & Delete Controls**: Pin favorite/frequent clips to the top or delete individual entries.
 * **Floating Glassmorphic Action Bar**: Copy selection (`Enter` / `Ctrl+C`), Select All (`Ctrl+A`), Google Search, Translate, or dismiss (`Esc`).
-* **Global Keyboard Shortcuts**: Press `Super + Shift + O` (or launch overlay mode) anywhere on your desktop.
+* **Global Keyboard Shortcuts**: Press `Ctrl + Shift + C` to capture a region or `Ctrl + Shift + L` to launch the interactive overlay anywhere on your desktop.
 * **Video Frame Preprocessing**: Auto-enhances contrast and detects dark slides/videos (auto-inverting them for near-100% Tesseract OCR accuracy).
 * **Zero Disk Writes**: In-memory pixel capture and streaming directly into the local OCR engine without saving temporary screenshots.
 * **No Root Required**: Interacts directly with Ubuntu's native `libtesseract.so.5` C-API without requiring `sudo` to run or download language packs.
@@ -48,7 +48,7 @@ cd copy_paste
 ### What the Installer Does Automatically:
 1. **Installs Launcher**: Creates the executable wrapper at `~/.local/bin/live-text-ocr`.
 2. **Downloads OCR Model**: Downloads and caches `eng.traineddata` in `~/.config/live-text-ocr/tessdata/`.
-3. **Binds Global Shortcut**: Registers `Super + Shift + O` in GNOME Settings via `gsettings`.
+3. **Binds Global Shortcuts**: Registers `Ctrl + Shift + C` for region capture and `Ctrl + Shift + L` for interactive overlay in GNOME Settings via `gsettings`.
 4. **Creates Desktop Entry**: Adds `Live Text OCR` to your Ubuntu Applications menu.
 5. **Configures Autostart**: Installs `~/.config/autostart/live-text-ocr.desktop` for graphical login.
 6. **Enables systemd Service**: Configures and starts `live-text-ocr.service` via `systemctl --user` so it runs continuously in the background.
@@ -80,8 +80,8 @@ cd copy_paste
   * **`✕ Quit Live Text`**: Close the indicator.
 
 ### 3. Global Keyboard Shortcut
-* Press **`Super + Shift + O`** anywhere on your desktop.
-* Drag a box over any text on your screen.
+* Press **`Ctrl + Shift + C`** to select a region, or **`Ctrl + Shift + L`** to open the full-screen overlay.
+* Drag a box or click words over any text on your screen.
 * Press **`Ctrl + V`** anywhere to paste.
 
 ---
@@ -153,7 +153,8 @@ Settings are saved in `~/.config/live-text-ocr/config.json`:
 
 ```json
 {
-  "shortcut": "<Super><Shift>o",
+  "shortcut_capture": "<Ctrl><Shift>c",
+  "shortcut_overlay": "<Ctrl><Shift>l",
   "ocr_language": "eng",
   "psm_mode": 6,
   "preprocess": {

@@ -44,14 +44,14 @@ def get_current_shortcut(name: str = "Live Text OCR") -> Optional[str]:
                 ["gsettings", "get", f"org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:{b_path}", "name"],
                 capture_output=True,
                 text=True,
-                check=True,
+                check=False,
             ).stdout.strip().strip("'\"")
             if b_name == name:
                 binding = subprocess.run(
                     ["gsettings", "get", f"org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:{b_path}", "binding"],
                     capture_output=True,
                     text=True,
-                    check=True,
+                    check=False,
                 ).stdout.strip().strip("'\"")
                 return binding
         except Exception:
@@ -59,22 +59,16 @@ def get_current_shortcut(name: str = "Live Text OCR") -> Optional[str]:
     return None
 
 
-def register_gnome_shortcut(
+def register_gnome_shortcut_by_name(
+    name: str,
     command_path: str,
-    binding: Optional[str] = None,
-    name: str = "Live Text OCR",
-) -> Tuple[bool, str]:
-    """Register or update the global shortcut in GNOME settings."""
-    config = load_config()
-    if binding is None:
-        binding = config.get("shortcut", "<Super><Shift>o")
-
+    binding: str,
+) -> bool:
+    """Register a named GNOME global shortcut, replacing any existing binding with the same name."""
     if not check_tool("gsettings"):
-        return False, "gsettings command not found. GNOME desktop environment is required."
+        return False
 
     existing_bindings = get_gnome_custom_bindings()
-    
-    # Check if our custom keybinding already exists
     target_path = None
     for b_path in existing_bindings:
         try:
@@ -91,7 +85,6 @@ def register_gnome_shortcut(
             continue
 
     if not target_path:
-        # Find next available index
         index = 0
         while True:
             candidate = f"/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom{index}/"
@@ -101,22 +94,41 @@ def register_gnome_shortcut(
             index += 1
         existing_bindings.append(target_path)
 
-    # Apply configuration
     schema = f"org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:{target_path}"
     try:
-        subprocess.run(["gsettings", "set", schema, "name", f"'{name}'"], check=True)
-        subprocess.run(["gsettings", "set", schema, "command", f"'{command_path}'"], check=True)
-        subprocess.run(["gsettings", "set", schema, "binding", f"'{binding}'"], check=True)
-
-        # Update keybindings array
-        bindings_str = str(existing_bindings)
+        # Ensure the path exists in the array before setting fields
         subprocess.run(
-            ["gsettings", "set", "org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings", bindings_str],
+            ["gsettings", "set", "org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings", str(existing_bindings)],
             check=True,
+            capture_output=True,
         )
-        return True, binding
+        subprocess.run(["gsettings", "set", schema, "name", name], check=True, capture_output=True)
+        subprocess.run(["gsettings", "set", schema, "command", command_path], check=True, capture_output=True)
+        subprocess.run(["gsettings", "set", schema, "binding", binding], check=True, capture_output=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"gsettings error: {e.stderr.decode('utf-8', errors='replace')}", file=sys.stderr)
+        return False
     except Exception as e:
-        return False, f"Failed to register shortcut: {e}"
+        print(f"register shortcut error: {e}", file=sys.stderr)
+        return False
+
+
+def register_gnome_shortcut(
+    command_path: str,
+    binding: Optional[str] = None,
+    name: str = "Live Text OCR",
+) -> Tuple[bool, str]:
+    """Register or update a GNOME global shortcut."""
+    default_binding = "<Ctrl><Shift>c" if name == "Live Text OCR" else "<Ctrl><Shift>l"
+    binding = binding or default_binding
+    ok = register_gnome_shortcut_by_name(name, command_path, binding)
+    if ok:
+        return True, binding
+
+    if not check_tool("gsettings"):
+        return False, "gsettings command not found. GNOME desktop environment is required."
+    return False, "Failed to register shortcut"
 
 
 def binding_to_display(binding: str) -> str:

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 const DEMO_LINES = [
@@ -12,7 +12,7 @@ const DEMO_LINES = [
 
 const FEATURES = [
   'Full-screen interactive overlay with hover and drag selection.',
-  'Global shortcut Super + Shift + O.',
+  'Global shortcuts: Ctrl+Shift+C for capture, Ctrl+Shift+L for overlay.',
   'Local OCR with libtesseract. Nothing is uploaded.',
   'QR and barcode decoding with libzbar.',
   'Clipboard history with pin and delete.',
@@ -27,7 +27,7 @@ const COMMANDS = [
   { cmd: 'live-text-ocr download-lang deu', desc: 'Add a language pack.' },
 ]
 
-const RELEASE_TAG = 'v1.0.0'
+const RELEASE_TAG = 'v1.0.1'
 
 function cx(...list) {
   return list.filter(Boolean).join(' ')
@@ -122,13 +122,13 @@ function TerminalDemo({ onCopy }) {
     }
   }
 
-  useMemo(() => {
+  useEffect(() => {
     const up = () => setIsDragging(false)
     window.addEventListener('mouseup', up)
     return () => window.removeEventListener('mouseup', up)
   }, [])
 
-  useMemo(() => {
+  useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') {
         setSelected(new Set())
@@ -147,7 +147,7 @@ function TerminalDemo({ onCopy }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [selected, selectedText, words, onCopy])
 
-  useMemo(() => {
+  useEffect(() => {
     if (selected.size === 0 || !toolbarRef.current || !firstRef.current) return
     const rect = firstRef.current.getBoundingClientRect()
     const cRect = containerRef.current.getBoundingClientRect()
@@ -236,7 +236,7 @@ function getDefaultArch() {
 
 function DownloadButton() {
   const [arch, setArch] = useState(getDefaultArch)
-  const filename = `live-text-ocr_1.0.0-1_${arch}.deb`
+  const filename = `live-text-ocr_1.0.1-1_${arch}.deb`
   const url = `https://github.com/iamadityamaurya/Live-Text-Like-Mac-in-Ubuntu/releases/download/${RELEASE_TAG}/${filename}`
 
   return (
@@ -258,17 +258,18 @@ function DownloadButton() {
 }
 
 function InstallBlock() {
-  const [copied, setCopied] = useState(false)
-  const command = `# amd64
-wget https://github.com/iamadityamaurya/Live-Text-Like-Mac-in-Ubuntu/releases/download/v1.0.0/live-text-ocr_1.0.0-1_amd64.deb
-sudo apt install ./live-text-ocr_1.0.0-1_amd64.deb
+  const commands = {
+    amd64: `wget https://github.com/iamadityamaurya/Live-Text-Like-Mac-in-Ubuntu/releases/download/v1.0.1/live-text-ocr_1.0.1-1_amd64.deb
+sudo apt install ./live-text-ocr_1.0.1-1_amd64.deb`,
+    arm64: `wget https://github.com/iamadityamaurya/Live-Text-Like-Mac-in-Ubuntu/releases/download/v1.0.1/live-text-ocr_1.0.1-1_arm64.deb
+sudo apt install ./live-text-ocr_1.0.1-1_arm64.deb`,
+  }
 
-# arm64
-wget https://github.com/iamadityamaurya/Live-Text-Like-Mac-in-Ubuntu/releases/download/v1.0.0/live-text-ocr_1.0.0-1_arm64.deb
-sudo apt install ./live-text-ocr_1.0.0-1_arm64.deb`
+  const [activeArch, setActiveArch] = useState('amd64')
+  const [copied, setCopied] = useState(false)
 
   const copy = () => {
-    navigator.clipboard.writeText(command).then(() => {
+    navigator.clipboard.writeText(commands[activeArch]).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     })
@@ -277,13 +278,26 @@ sudo apt install ./live-text-ocr_1.0.0-1_arm64.deb`
   return (
     <div className="install-block">
       <div className="install-header">
-        <span>terminal</span>
+        <div className="install-tabs">
+          <button
+            className={cx('install-tab', activeArch === 'amd64' && 'active')}
+            onClick={() => setActiveArch('amd64')}
+          >
+            amd64
+          </button>
+          <button
+            className={cx('install-tab', activeArch === 'arm64' && 'active')}
+            onClick={() => setActiveArch('arm64')}
+          >
+            arm64
+          </button>
+        </div>
         <button className="copy-btn" onClick={copy}>
           {copied ? 'copied' : 'copy'}
         </button>
       </div>
       <pre className="install-code">
-        <code>{command}</code>
+        <code>{commands[activeArch]}</code>
       </pre>
     </div>
   )
@@ -330,7 +344,7 @@ function App() {
                 instantly. Local OCR. No cloud. No root.
               </p>
               <div className="shortcut">
-                <kbd>super</kbd> + <kbd>shift</kbd> + <kbd>o</kbd>
+                <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> capture <span className="shortcut-div">·</span> <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>L</kbd> overlay
               </div>
               <div className="hero-actions">
                 <a href="#install" className="btn btn-primary">

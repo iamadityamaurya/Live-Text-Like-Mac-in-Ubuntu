@@ -30,6 +30,8 @@ for arch in amd64 arm64; do
   cp "${PKG_DIR}/debian/live-text-ocr.desktop" "${PKG}/usr/share/applications/"
   cp "${PKG_DIR}/debian/live-text-ocr.service" "${PKG}/usr/lib/systemd/user/"
   cp "${PKG_DIR}/debian/gnome-shortcut.ini" "${PKG}/usr/share/live-text-ocr/"
+  cp "${PKG_DIR}/debian/postinst-user-setup.sh" "${PKG}/usr/share/live-text-ocr/postinst-user-setup.sh"
+  chmod 0755 "${PKG}/usr/share/live-text-ocr/postinst-user-setup.sh"
 
   cat > "${PKG}/DEBIAN/control" <<EOF
 Package: live-text-ocr
@@ -37,7 +39,7 @@ Version: ${VERSION}-1
 Section: utils
 Priority: optional
 Architecture: ${arch}
-Depends: python3, python3-pil, python3-pyqt6, libtesseract5, libzbar0, grim, slurp, wl-clipboard, libnotify-bin, xclip | xsel
+Depends: python3, python3-pil, python3-pyqt6, libtesseract5, libzbar0, grim, slurp, wl-clipboard, libnotify-bin, xclip | xsel, gir1.2-glib-2.0
 Maintainer: Aditya <your.email@example.com>
 Description: macOS Live Text-style OCR utility for Ubuntu
  Select any rectangular region on your screen and instantly

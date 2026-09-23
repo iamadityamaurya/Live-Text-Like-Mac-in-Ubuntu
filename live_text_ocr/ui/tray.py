@@ -284,10 +284,15 @@ class LiveTextTrayIcon(QSystemTrayIcon):
         # 4. Settings submenu
         settings_menu = self.menu.addMenu("⚙   Settings")
 
-        current_binding = get_current_shortcut() or load_config().get("shortcut", "<Super><Shift>o")
-        shortcut_label = f"Keyboard shortcut: {binding_to_display(current_binding)}"
-        act_shortcut = settings_menu.addAction(shortcut_label)
-        act_shortcut.triggered.connect(self._open_shortcut_dialog)
+        config = load_config()
+        capture_binding = get_current_shortcut("Live Text OCR") or config.get("shortcut_capture", "<F8>")
+        overlay_binding = get_current_shortcut("Live Text OCR Overlay") or config.get("shortcut_overlay", "<F9>")
+
+        act_capture = settings_menu.addAction(f"Capture shortcut: {binding_to_display(capture_binding)}")
+        act_capture.triggered.connect(lambda: self._open_shortcut_dialog("capture"))
+
+        act_overlay = settings_menu.addAction(f"Overlay shortcut: {binding_to_display(overlay_binding)}")
+        act_overlay.triggered.connect(lambda: self._open_shortcut_dialog("overlay"))
 
         # 5. Quit Button (Bottom)
         action_quit = QAction("✕   Quit Live Text", self)
@@ -311,13 +316,17 @@ class LiveTextTrayIcon(QSystemTrayIcon):
         self._rebuild_menu()
         notify_success("History cleared.")
 
-    def _open_shortcut_dialog(self):
-        """Open a small dialog to change the global keyboard shortcut."""
+    def _open_shortcut_dialog(self, mode: str = "capture"):
+        """Open a small dialog to change a global keyboard shortcut."""
         config = load_config()
-        current = config.get("shortcut", "<Super><Shift>o")
+        key = f"shortcut_{mode}"
+        title_map = {"capture": "Capture Region", "overlay": "Interactive Overlay"}
+        name_map = {"capture": "Live Text OCR", "overlay": "Live Text OCR Overlay"}
+        command_map = {"capture": "capture", "overlay": "live"}
+        current = config.get(key, "<Ctrl><Shift>c" if mode == "capture" else "<Ctrl><Shift>l")
 
         dialog = QDialog()
-        dialog.setWindowTitle("Live Text OCR — Keyboard Shortcut")
+        dialog.setWindowTitle(f"Live Text OCR — {title_map[mode]} Shortcut")
         dialog.setMinimumWidth(340)
         dialog.setStyleSheet("""
             QDialog {
@@ -364,14 +373,14 @@ class LiveTextTrayIcon(QSystemTrayIcon):
         layout.setSpacing(14)
 
         info = QLabel(
-            "Format: &lt;Super&gt;&lt;Shift&gt;o, &lt;Ctrl&gt;&lt;Alt&gt;t, etc.\n"
+            "Format examples: &lt;F8&gt;, &lt;Super&gt;&lt;Shift&gt;o, &lt;Ctrl&gt;&lt;Alt&gt;t.\n"
             "Use modifier names: Super, Ctrl, Alt, Shift."
         )
         info.setWordWrap(True)
         layout.addWidget(info)
 
         input_field = QLineEdit(current)
-        input_field.setPlaceholderText("<Super><Shift>o")
+        input_field.setPlaceholderText("<Ctrl><Shift>c" if mode == "capture" else "<Ctrl><Shift>l")
         layout.addWidget(input_field)
 
         btn_row = QHBoxLayout()
@@ -403,14 +412,18 @@ class LiveTextTrayIcon(QSystemTrayIcon):
             new_binding = input_field.text().strip()
             if not new_binding:
                 return
-            config["shortcut"] = new_binding
+            config[key] = new_binding
             save_config(config)
 
             local_bin = Path.home() / ".local/bin/live-text-ocr"
-            exec_path = str(local_bin) if local_bin.exists() else "live-text-ocr capture"
-            ok, msg = register_gnome_shortcut(exec_path, binding=new_binding)
+            if local_bin.exists():
+                exec_path = f"{local_bin} {command_map[mode]}"
+            else:
+                exec_path = f"live-text-ocr {command_map[mode]}"
+
+            ok, msg = register_gnome_shortcut(exec_path, binding=new_binding, name=name_map[mode])
             if ok:
-                notify_success(f"Shortcut set to {binding_to_display(new_binding)}")
+                notify_success(f"{title_map[mode]} shortcut set to {binding_to_display(new_binding)}")
                 dialog.accept()
                 self._rebuild_menu()
             else:

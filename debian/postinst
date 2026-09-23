@@ -14,34 +14,12 @@ except Exception as e:
     print(f"Warning: could not download language data: {e}", file=sys.stderr)
 PY
 
-    # Register GNOME global shortcut if gsettings is available
-    if command -v gsettings >/dev/null 2>&1; then
-      BASE="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings"
-      EXISTING=$(gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings 2>/dev/null || true)
-      PATHS="${EXISTING}"
-
-      # Ensure array contains our path
-      case "${EXISTING}" in
-        *"${BASE}/custom-live-text-ocr/"*)
-          ;;
-        *"@as []"*|*"[]"*)
-          PATHS="['${BASE}/custom-live-text-ocr/']"
-          ;;
-        *)
-          # Append to existing list safely
-          PATHS=$(python3 -c "import ast,sys; v=ast.literal_eval(sys.argv[1].lstrip('@as ')); v=[p for p in v if 'custom-live-text-ocr' not in p]; v.append('${BASE}/custom-live-text-ocr/'); print(str(v))" "${EXISTING}")
-          ;;
-      esac
-
-      gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "${PATHS}" || true
-      gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${BASE}/custom-live-text-ocr/ name 'Live Text OCR' || true
-      gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${BASE}/custom-live-text-ocr/ command '/usr/bin/live-text-ocr capture' || true
-      gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${BASE}/custom-live-text-ocr/ binding '<Super><Shift>o' || true
-    fi
-
-    # Enable systemd user service for the installing user (best effort)
+    # Register shortcuts and enable user service as the installing user.
+    # gsettings / systemd need the user's D-Bus session bus.
     if [ -n "${SUDO_USER}" ]; then
-      su - "${SUDO_USER}" -c 'systemctl --user daemon-reload && systemctl --user enable live-text-ocr.service' || true
+      if [ -x /usr/share/live-text-ocr/postinst-user-setup.sh ]; then
+        su - "${SUDO_USER}" -c 'export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id - u)/bus"; /usr/share/live-text-ocr/postinst-user-setup.sh' || true
+      fi
     fi
     ;;
 esac

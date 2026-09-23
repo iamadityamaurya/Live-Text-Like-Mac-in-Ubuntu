@@ -24,8 +24,7 @@ jobs:
 
       - name: Build .deb for ${{ matrix.arch }}
         run: |
-          sed -i "s/^Architecture:.*/Architecture: ${{ matrix.arch }}/" debian/control
-          dpkg-buildpackage -us -uc -b -a${{ matrix.arch }} -rfakeroot
+          ./build-deb-simple.sh "${GITHUB_REF_NAME#v}"
 
       - name: Collect .deb
         run: |

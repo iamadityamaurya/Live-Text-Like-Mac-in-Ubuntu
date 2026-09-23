@@ -1,22 +1,24 @@
-/* Ubuntu / GNOME dark palette with a warm paper texture */
-:root {
-  --bg: #121212;
-  --panel: #1c1c1c;
-  --panel-2: #232323;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
-  --text: #a0a0a0;
-  --text-h: #f2f2f2;
-  --text-muted: #737373;
-  --accent: #e95420;
-  --accent-soft: rgba(233, 84, 32, 0.12);
-  --accent-glow: rgba(233, 84, 32, 0.22);
-  --link: #e95420;
-  --success: #0e8420;
-  --warning: #f2994a;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-  --sans: 'Ubuntu', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --mono: 'Ubuntu Mono', 'SF Mono', Consolas, monospace;
+/* macOS-style glossy dark palette */
+:root {
+  --bg: #0a0a0c;
+  --panel: rgba(22, 22, 26, 0.72);
+  --panel-2: rgba(34, 34, 40, 0.9);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --text: #a8a8b0;
+  --text-h: #ffffff;
+  --text-muted: #6e6e76;
+  --accent: #e8e8ed;
+  --accent-soft: rgba(255, 255, 255, 0.10);
+  --accent-glow: rgba(255, 255, 255, 0.18);
+  --link: #ffffff;
+  --success: #30d158;
+  --warning: #ff9f0a;
+
+  --sans: 'Inter', 'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
 
   font: 16px/160% var(--sans);
   color-scheme: dark;
@@ -25,6 +27,7 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 * {
@@ -39,9 +42,34 @@ body {
   margin: 0;
   min-height: 100svh;
   background:
-    radial-gradient(ellipse 80% 30% at 20% 10%, rgba(233, 84, 32, 0.06), transparent),
-    radial-gradient(ellipse 60% 40% at 85% 60%, rgba(233, 84, 32, 0.04), transparent),
+    radial-gradient(ellipse 70% 40% at 20% -10%, rgba(120, 120, 140, 0.16), transparent),
+    radial-gradient(ellipse 60% 50% at 90% 20%, rgba(120, 120, 140, 0.08), transparent),
+    radial-gradient(ellipse 70% 50% at 50% 110%, rgba(120, 120, 140, 0.12), transparent),
     var(--bg);
+}
+
+.landing {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+.ambient-glow {
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80vw;
+  height: 80vw;
+  max-width: 900px;
+  max-height: 900px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(140, 140, 160, 0.16), transparent 60%);
+  filter: blur(100px);
+  pointer-events: none;
+  z-index: 0;
 }
 
 #root {
@@ -54,10 +82,10 @@ h1,
 h2,
 h3 {
   font-family: var(--sans);
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-h);
   margin: 0;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
 }
 
 p {
@@ -72,6 +100,7 @@ a {
 button {
   font-family: inherit;
   cursor: pointer;
+  background: none;
 }
 
 code,
@@ -81,13 +110,13 @@ pre {
 
 .container {
   width: 100%;
-  max-width: 1040px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 28px;
 }
 
 .container.narrow {
-  max-width: 720px;
+  max-width: 740px;
 }
 
 @media (max-width: 640px) {
@@ -96,6 +125,12 @@ pre {
   }
 
   .container {
-    padding: 0 18px;
+    padding: 0 20px;
+  }
+
+  .ambient-glow {
+    width: 120vw;
+    height: 120vw;
+    top: -10%;
   }
 }

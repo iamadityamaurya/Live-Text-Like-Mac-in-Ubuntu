@@ -1,0 +1,13 @@
+[Unit]
+Description=Live Text OCR Tray Indicator
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/live-text-ocr tray
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

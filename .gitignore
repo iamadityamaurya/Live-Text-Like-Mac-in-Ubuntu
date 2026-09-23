@@ -34,5 +34,18 @@ ENV/
 *.swp
 *.swo
 
+# Debian build artifacts
+deb-build/
+deb-build-simple/
+*.deb
+*.changes
+*.buildinfo
+*.dsc
+*.tar.gz
+*.tar.xz
+
+# Vite / Node
+web/node_modules/
+web/dist/
 
 future_idea.md

@@ -1,0 +1,51 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+  configure)
+    # Download English OCR model if missing
+    python3 - <<'PY'
+import sys
+sys.path.insert(0, '/usr/lib/python3/dist-packages')
+from live_text_ocr.core.ocr_engine import ensure_language_data
+try:
+    ensure_language_data('eng')
+except Exception as e:
+    print(f"Warning: could not download language data: {e}", file=sys.stderr)
+PY
+
+    # Register GNOME global shortcut if gsettings is available
+    if command -v gsettings >/dev/null 2>&1; then
+      BASE="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings"
+      EXISTING=$(gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings 2>/dev/null || true)
+      PATHS="${EXISTING}"
+
+      # Ensure array contains our path
+      case "${EXISTING}" in
+        *"${BASE}/custom-live-text-ocr/"*)
+          ;;
+        *"@as []"*|*"[]"*)
+          PATHS="['${BASE}/custom-live-text-ocr/']"
+          ;;
+        *)
+          # Append to existing list safely
+          PATHS=$(python3 -c "import ast,sys; v=ast.literal_eval(sys.argv[1].lstrip('@as ')); v=[p for p in v if 'custom-live-text-ocr' not in p]; v.append('${BASE}/custom-live-text-ocr/'); print(str(v))" "${EXISTING}")
+          ;;
+      esac
+
+      gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "${PATHS}" || true
+      gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${BASE}/custom-live-text-ocr/ name 'Live Text OCR' || true
+      gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${BASE}/custom-live-text-ocr/ command '/usr/bin/live-text-ocr capture' || true
+      gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${BASE}/custom-live-text-ocr/ binding '<Super><Shift>o' || true
+    fi
+
+    # Enable systemd user service for the installing user (best effort)
+    if [ -n "${SUDO_USER}" ]; then
+      su - "${SUDO_USER}" -c 'systemctl --user daemon-reload && systemctl --user enable live-text-ocr.service' || true
+    fi
+    ;;
+esac
+
+#DEBHELPER#
+
+exit 0

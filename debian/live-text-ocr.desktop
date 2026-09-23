@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Live Text OCR
+Comment=macOS Live Text-style screen OCR utility
+Exec=/usr/bin/live-text-ocr tray
+Icon=edit-copy
+Terminal=false
+Type=Application
+Categories=Utility;
+Keywords=OCR;Screenshot;LiveText;Clipboard;Tray;Panel;
+StartupNotify=false
+X-GNOME-Autostart-enabled=true

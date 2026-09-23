@@ -3,6 +3,7 @@
 import sys
 import threading
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
@@ -18,11 +19,18 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import (
     QApplication,
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
     QMenu,
+    QMessageBox,
+    QPushButton,
     QSystemTrayIcon,
+    QVBoxLayout,
 )
 
-from live_text_ocr.config import load_config
+from live_text_ocr.config import load_config, save_config
 from live_text_ocr.core.capture import capture_selected_region, CaptureCancelled
 from live_text_ocr.core.clipboard import copy_to_clipboard
 from live_text_ocr.core.history import (
@@ -35,6 +43,11 @@ from live_text_ocr.core.history import (
 from live_text_ocr.core.notify import notify_error, notify_success
 from live_text_ocr.core.ocr_engine import TesseractEngine
 from live_text_ocr.core.preprocess import preprocess_image
+from live_text_ocr.keybindings import (
+    binding_to_display,
+    get_current_shortcut,
+    register_gnome_shortcut,
+)
 
 
 def create_tray_icon() -> QIcon:
@@ -268,7 +281,15 @@ class LiveTextTrayIcon(QSystemTrayIcon):
 
         self.menu.addSeparator()
 
-        # 4. Quit Button (Bottom)
+        # 4. Settings submenu
+        settings_menu = self.menu.addMenu("⚙   Settings")
+
+        current_binding = get_current_shortcut() or load_config().get("shortcut", "<Super><Shift>o")
+        shortcut_label = f"Keyboard shortcut: {binding_to_display(current_binding)}"
+        act_shortcut = settings_menu.addAction(shortcut_label)
+        act_shortcut.triggered.connect(self._open_shortcut_dialog)
+
+        # 5. Quit Button (Bottom)
         action_quit = QAction("✕   Quit Live Text", self)
         action_quit.triggered.connect(QApplication.quit)
         self.menu.addAction(action_quit)
@@ -289,6 +310,116 @@ class LiveTextTrayIcon(QSystemTrayIcon):
         clear_history()
         self._rebuild_menu()
         notify_success("History cleared.")
+
+    def _open_shortcut_dialog(self):
+        """Open a small dialog to change the global keyboard shortcut."""
+        config = load_config()
+        current = config.get("shortcut", "<Super><Shift>o")
+
+        dialog = QDialog()
+        dialog.setWindowTitle("Live Text OCR — Keyboard Shortcut")
+        dialog.setMinimumWidth(340)
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: #1c1c1c;
+                color: #f2f2f2;
+                font-family: 'Ubuntu', sans-serif;
+                font-size: 14px;
+            }
+            QLabel {
+                color: #a0a0a0;
+                font-size: 13px;
+            }
+            QLineEdit {
+                background-color: #232323;
+                color: #f2f2f2;
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                border-radius: 8px;
+                padding: 8px 10px;
+                font-family: 'Ubuntu Mono', monospace;
+                font-size: 13px;
+            }
+            QPushButton {
+                background-color: #e95420;
+                color: #fff;
+                border: none;
+                border-radius: 8px;
+                padding: 8px 16px;
+                font-weight: 700;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #f06a33;
+            }
+            QPushButton.secondary {
+                background-color: #333333;
+                color: #f2f2f2;
+            }
+            QPushButton.secondary:hover {
+                background-color: #404040;
+            }
+        """)
+
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(14)
+
+        info = QLabel(
+            "Format: &lt;Super&gt;&lt;Shift&gt;o, &lt;Ctrl&gt;&lt;Alt&gt;t, etc.\n"
+            "Use modifier names: Super, Ctrl, Alt, Shift."
+        )
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        input_field = QLineEdit(current)
+        input_field.setPlaceholderText("<Super><Shift>o")
+        layout.addWidget(input_field)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+
+        save_btn = QPushButton("Save")
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setProperty("class", "secondary")
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #333333;
+                color: #f2f2f2;
+                border: none;
+                border-radius: 8px;
+                padding: 8px 16px;
+                font-weight: 700;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #404040;
+            }
+        """)
+
+        btn_row.addWidget(cancel_btn)
+        btn_row.addWidget(save_btn)
+        layout.addLayout(btn_row)
+
+        def save():
+            new_binding = input_field.text().strip()
+            if not new_binding:
+                return
+            config["shortcut"] = new_binding
+            save_config(config)
+
+            local_bin = Path.home() / ".local/bin/live-text-ocr"
+            exec_path = str(local_bin) if local_bin.exists() else "live-text-ocr capture"
+            ok, msg = register_gnome_shortcut(exec_path, binding=new_binding)
+            if ok:
+                notify_success(f"Shortcut set to {binding_to_display(new_binding)}")
+                dialog.accept()
+                self._rebuild_menu()
+            else:
+                QMessageBox.critical(dialog, "Shortcut Error", str(msg))
+
+        save_btn.clicked.connect(save)
+        cancel_btn.clicked.connect(dialog.reject)
+
+        dialog.exec()
 
     def _on_activated(self, reason):
         if reason in (

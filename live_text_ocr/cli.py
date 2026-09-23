@@ -228,7 +228,8 @@ def cmd_download_lang(args: argparse.Namespace) -> int:
 
 def cmd_setup_shortcut(args: argparse.Namespace) -> int:
     """Register the GNOME global shortcut."""
-    binding = args.binding or "<Super><Shift>o"
+    config = load_config()
+    binding = args.binding or config.get("shortcut", "<Super><Shift>o")
     exec_path = args.command or "live-text-ocr capture"
     
     # Check if live-text-ocr is in ~/.local/bin/
@@ -238,7 +239,9 @@ def cmd_setup_shortcut(args: argparse.Namespace) -> int:
 
     success, msg = register_gnome_shortcut(exec_path, binding=binding)
     if success:
-        print(f"✅ {msg}")
+        config["shortcut"] = binding
+        save_config(config)
+        print(f"✅ Shortcut {binding} registered to command: {exec_path}")
         return 0
     else:
         print(f"❌ {msg}", file=sys.stderr)

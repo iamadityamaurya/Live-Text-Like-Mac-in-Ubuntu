@@ -1,0 +1,26 @@
+Source: live-text-ocr
+Section: utils
+Priority: optional
+Maintainer: Aditya <your.email@example.com>
+Build-Depends: debhelper (>= 12), python3, python3-setuptools, dh-python
+Standards-Version: 4.6.0
+Rules-Requires-Root: no
+
+Package: live-text-ocr
+Architecture: any
+Depends: ${python3:Depends}, ${misc:Depends},
+  python3-pil,
+  python3-pyqt6,
+  libtesseract5,
+  libzbar0,
+  grim,
+  slurp,
+  wl-clipboard,
+  libnotify-bin,
+  xclip | xsel,
+  gnome-screenshot
+Description: macOS Live Text-style OCR utility for Ubuntu
+ Select any rectangular region on your screen — including paused videos,
+ PDFs, slides, images, or terminals — and instantly extract and copy the
+ text to your clipboard. Includes an interactive overlay, top-panel
+ indicator, QR/barcode scanning, clipboard history, and global shortcut.

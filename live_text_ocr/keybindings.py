@@ -4,8 +4,9 @@ import ast
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
+from live_text_ocr.config import load_config
 from live_text_ocr.core.session import check_tool
 
 
@@ -35,12 +36,39 @@ def get_gnome_custom_bindings() -> list:
         return []
 
 
+def get_current_shortcut(name: str = "Live Text OCR") -> Optional[str]:
+    """Return the current GNOME shortcut binding for this app, if any."""
+    for b_path in get_gnome_custom_bindings():
+        try:
+            b_name = subprocess.run(
+                ["gsettings", "get", f"org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:{b_path}", "name"],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip().strip("'\"")
+            if b_name == name:
+                binding = subprocess.run(
+                    ["gsettings", "get", f"org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:{b_path}", "binding"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                ).stdout.strip().strip("'\"")
+                return binding
+        except Exception:
+            continue
+    return None
+
+
 def register_gnome_shortcut(
     command_path: str,
-    binding: str = "<Super><Shift>o",
+    binding: Optional[str] = None,
     name: str = "Live Text OCR",
 ) -> Tuple[bool, str]:
     """Register or update the global shortcut in GNOME settings."""
+    config = load_config()
+    if binding is None:
+        binding = config.get("shortcut", "<Super><Shift>o")
+
     if not check_tool("gsettings"):
         return False, "gsettings command not found. GNOME desktop environment is required."
 
@@ -86,6 +114,15 @@ def register_gnome_shortcut(
             ["gsettings", "set", "org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings", bindings_str],
             check=True,
         )
-        return True, f"Shortcut {binding} successfully registered to command: {command_path}"
+        return True, binding
     except Exception as e:
         return False, f"Failed to register shortcut: {e}"
+
+
+def binding_to_display(binding: str) -> str:
+    """Convert a gsettings binding string to a human readable shortcut."""
+    if not binding:
+        return "None"
+    parts = binding.replace("<", " ").replace(">", " ").strip().split()
+    return " + ".join(p.title() if not p.startswith("Shift") else "Shift" for p in parts)
+

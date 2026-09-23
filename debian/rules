@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE = 1
+export PYBUILD_NAME = live-text-ocr
+export PYBUILD_SYSTEM = distutils
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_install:
+	dh_auto_install
+	install -D -m 0755 debian/live-text-ocr.sh debian/live-text-ocr/usr/bin/live-text-ocr
+	install -D -m 0644 debian/live-text-ocr.desktop debian/live-text-ocr/usr/share/applications/live-text-ocr.desktop
+	install -D -m 0644 debian/live-text-ocr.service debian/live-text-ocr/usr/lib/systemd/user/live-text-ocr.service
+	install -D -m 0644 debian/gnome-shortcut.ini debian/live-text-ocr/usr/share/live-text-ocr/gnome-shortcut.ini

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 const DEMO_LINES = [
@@ -9,6 +9,8 @@ const DEMO_LINES = [
   ['$', 'live-text-ocr', 'qr'],
   ['Decoded', 'QR', '(128', 'chars):', 'https://github.com/...'],
 ]
+
+const SCAN_STEP_MS = 180
 
 const FEATURES = [
   {
@@ -57,39 +59,99 @@ const COMMANDS = [
   { cmd: 'live-text-ocr download-lang deu', desc: 'Add a language pack' },
 ]
 
+const SURFACES = [
+  'Paused videos',
+  'PDFs & papers',
+  'Terminal',
+  'Slides',
+  'VS Code',
+  'Browser windows',
+  'Image viewers',
+  'LibreOffice',
+  'Obsidian',
+  'Slack',
+]
+
 const RELEASE_TAG = 'v1.0.1'
 
 function cx(...list) {
   return list.filter(Boolean).join(' ')
 }
 
-function useOnScreen(options = {}) {
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const onChange = () => setReduced(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return reduced
+}
+
+function useFinePointer() {
+  const [fine, setFine] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(hover: hover) and (pointer: fine)')
+    const onChange = () => setFine(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return fine
+}
+
+function useOnScreen() {
   const ref = useRef(null)
   const [visible, setVisible] = useState(false)
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const obs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        setVisible(true)
-        obs.unobserve(el)
-      }
-    }, { threshold: 0.12, ...options })
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true)
+          obs.unobserve(el)
+        }
+      },
+      { threshold: 0.12 },
+    )
     obs.observe(el)
     return () => obs.disconnect()
-  }, [options])
+  }, [])
   return [ref, visible]
 }
 
 function useToast() {
-  const [toast, setToast] = useState(null)
-  const timer = useRef(null)
-  const show = (message, duration = 1800) => {
-    if (timer.current) clearTimeout(timer.current)
-    setToast(message)
-    timer.current = setTimeout(() => setToast(null), duration)
+  const [state, setState] = useState({ message: null, visible: false })
+  const timers = useRef([])
+  const show = (message, duration = 2000) => {
+    timers.current.forEach(clearTimeout)
+    timers.current = []
+    setState({ message, visible: true })
+    timers.current.push(
+      setTimeout(() => setState((s) => ({ ...s, visible: false })), duration),
+    )
   }
-  return { toast, show }
+  useEffect(() => () => timers.current.forEach(clearTimeout), [])
+  return { toast: state.message, toastVisible: state.visible, show }
+}
+
+function Reveal({ className = '', delay = 0, children, ...rest }) {
+  const [ref, visible] = useOnScreen()
+  return (
+    <div
+      ref={ref}
+      className={cx(className, visible && 'reveal')}
+      style={{ animationDelay: `${delay}ms` }}
+      {...rest}
+    >
+      {children}
+    </div>
+  )
 }
 
 function Icon({ name }) {
@@ -138,14 +200,20 @@ function Icon({ name }) {
 function Logo() {
   return (
     <svg className="logo-mark" viewBox="0 0 64 64" aria-hidden="true">
-      <rect x="9" y="9" width="46" height="46" rx="14" fill="#ffffff" />
+      <defs>
+        <linearGradient id="logo-g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ff7a45" />
+          <stop offset="1" stopColor="#e95420" />
+        </linearGradient>
+      </defs>
+      <rect x="6" y="6" width="52" height="52" rx="15" fill="url(#logo-g)" />
       <path
-        d="M21 21 h7 M21 21 v7 M43 21 h-7 M43 21 v7 M21 43 h7 M21 43 v-7 M43 43 h-7 M43 43 v-7"
-        stroke="rgba(10,10,12,0.85)"
-        strokeWidth="3"
+        d="M15 15 h6 M15 15 v6 M49 15 h-6 M49 15 v6 M15 49 h6 M15 49 v-6 M49 49 h-6 M49 49 v-6"
+        stroke="rgba(255,255,255,0.85)"
+        strokeWidth="3.2"
         strokeLinecap="round"
       />
-      <text x="32" y="44" textAnchor="middle" fontSize="24" fontWeight="700" fill="#0a0a0c">
+      <text x="32" y="43" textAnchor="middle" fontSize="24" fontWeight="700" fill="#ffffff">
         T
       </text>
     </svg>
@@ -156,9 +224,53 @@ function TerminalDemo({ onCopy }) {
   const [hoveredId, setHoveredId] = useState(null)
   const [selected, setSelected] = useState(new Set())
   const [isDragging, setIsDragging] = useState(false)
+  const [detected, setDetected] = useState(() => new Set())
+  const [scan, setScan] = useState(false)
   const containerRef = useRef(null)
+  const bodyRef = useRef(null)
+  const scanRef = useRef(null)
   const toolbarRef = useRef(null)
   const firstRef = useRef(null)
+  const reduced = usePrefersReducedMotion()
+
+  /* One-shot OCR scan sweep on mount — shows how detection works.
+     Everything is scheduled via timeouts so no synchronous setState in the effect. */
+  useEffect(() => {
+    if (reduced) return
+    const timers = []
+    const start = 380
+    timers.push(setTimeout(() => setScan(true), start))
+    DEMO_LINES.forEach((line, i) => {
+      const ids = line.map((_, w) => `${i}-${w}`)
+      timers.push(
+        setTimeout(() => {
+          setDetected((prev) => {
+            const next = new Set(prev)
+            ids.forEach((id) => next.add(id))
+            return next
+          })
+          timers.push(
+            setTimeout(() => {
+              setDetected((prev) => {
+                const next = new Set(prev)
+                ids.forEach((id) => next.delete(id))
+                return next
+              })
+            }, 620),
+          )
+        }, start + 60 + i * SCAN_STEP_MS),
+      )
+    })
+    timers.push(setTimeout(() => setScan(false), start + DEMO_LINES.length * SCAN_STEP_MS + 700))
+    return () => timers.forEach(clearTimeout)
+  }, [reduced])
+
+  /* Size the sweep to the terminal body. */
+  useLayoutEffect(() => {
+    if (!scan || !scanRef.current || !bodyRef.current) return
+    scanRef.current.style.setProperty('--scan-d', `${bodyRef.current.offsetHeight - 6}px`)
+    scanRef.current.style.setProperty('--scan-t', `${DEMO_LINES.length * SCAN_STEP_MS}ms`)
+  }, [scan])
 
   const words = useMemo(() => {
     const all = []
@@ -236,18 +348,18 @@ function TerminalDemo({ onCopy }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [selected, selectedText, words, onCopy])
 
-  useEffect(() => {
-    if (selected.size === 0 || !toolbarRef.current || !firstRef.current) return
+  /* Position the floating toolbar with transform so it glides between selections. */
+  useLayoutEffect(() => {
+    const tb = toolbarRef.current
+    if (selected.size === 0 || !tb || !firstRef.current || !containerRef.current) return
     const rect = firstRef.current.getBoundingClientRect()
     const cRect = containerRef.current.getBoundingClientRect()
-    const tb = toolbarRef.current
-    const left = Math.min(
+    const x = Math.min(
       Math.max(rect.left - cRect.left - tb.offsetWidth / 2 + rect.width / 2, 12),
       cRect.width - tb.offsetWidth - 12,
     )
-    const top = Math.max(rect.top - cRect.top - tb.offsetHeight - 12, 12)
-    tb.style.left = `${left}px`
-    tb.style.top = `${top}px`
+    const y = Math.max(rect.top - cRect.top - tb.offsetHeight - 12, 12)
+    tb.style.transform = `translate(${x}px, ${y}px)`
   }, [selected])
 
   const firstId = selected.size > 0 ? selected.keys().next().value : null
@@ -263,7 +375,7 @@ function TerminalDemo({ onCopy }) {
         </div>
         <span className="terminal-title">live-text-ocr --demo</span>
       </div>
-      <div className="terminal-body">
+      <div className="terminal-body" ref={bodyRef}>
         {DEMO_LINES.map((line, lineIdx) => (
           <div key={lineIdx} className="terminal-line">
             {line.map((text, wordIdx) => {
@@ -271,6 +383,7 @@ function TerminalDemo({ onCopy }) {
               const isPrompt = text === '$' || text === '#'
               const isSelected = selected.has(id)
               const isHovered = hoveredId === id
+              const isDetected = detected.has(id)
               return (
                 <span
                   key={id}
@@ -280,6 +393,7 @@ function TerminalDemo({ onCopy }) {
                     isPrompt && 'prompt',
                     isSelected && 'selected',
                     isHovered && 'hovered',
+                    isDetected && 'detected',
                   )}
                   onMouseEnter={() => handleEnter(id)}
                   onMouseLeave={() => setHoveredId((prev) => (prev === id ? null : prev))}
@@ -292,27 +406,94 @@ function TerminalDemo({ onCopy }) {
           </div>
         ))}
         <span className="terminal-cursor" />
+        {scan && <div className="scan-line" ref={scanRef} />}
       </div>
 
       {selected.size > 0 && (
         <div className="terminal-toolbar" ref={toolbarRef}>
-          <span className="tb-count">{selected.size}</span>
-          <button className="tb-btn primary" onClick={() => onCopy(selectedText)}>
-            copy
-          </button>
-          <button
-            className="tb-btn"
-            onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(selectedText)}`, '_blank')}
-          >
-            search
-          </button>
-          <button className="tb-btn" onClick={() => setSelected(new Set())}>
-            clear
-          </button>
+          <div className="terminal-toolbar-inner">
+            <span className="tb-count">{selected.size}</span>
+            <button className="tb-btn primary" onClick={() => onCopy(selectedText)}>
+              copy
+            </button>
+            <button
+              className="tb-btn"
+              onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(selectedText)}`, '_blank')}
+            >
+              search
+            </button>
+            <button className="tb-btn" onClick={() => setSelected(new Set())}>
+              clear
+            </button>
+          </div>
         </div>
       )}
 
       <div className="terminal-hint">hover · click · drag · esc · ctrl+a</div>
+    </div>
+  )
+}
+
+/* Decorative mouse tilt for the hero demo — spring-lerped, fine pointers only. */
+function HeroDemo({ children }) {
+  const wrapRef = useRef(null)
+  const tiltRef = useRef(null)
+  const fine = useFinePointer()
+  const reduced = usePrefersReducedMotion()
+
+  useEffect(() => {
+    if (!fine || reduced) return
+    const wrap = wrapRef.current
+    const tilt = tiltRef.current
+    if (!wrap || !tilt) return
+    let raf = null
+    const cur = { x: 0, y: 0 }
+    const target = { x: 0, y: 0 }
+    const MAX = 4.5
+
+    const loop = () => {
+      cur.x += (target.x - cur.x) * 0.075
+      cur.y += (target.y - cur.y) * 0.075
+      tilt.style.transform = `rotateX(${cur.x.toFixed(3)}deg) rotateY(${cur.y.toFixed(3)}deg)`
+      raf =
+        Math.abs(target.x - cur.x) > 0.005 || Math.abs(target.y - cur.y) > 0.005
+          ? requestAnimationFrame(loop)
+          : null
+    }
+    const kick = () => {
+      if (raf === null) raf = requestAnimationFrame(loop)
+    }
+    const onMove = (e) => {
+      const r = wrap.getBoundingClientRect()
+      const px = (e.clientX - r.left) / r.width - 0.5
+      const py = (e.clientY - r.top) / r.height - 0.5
+      target.x = -py * MAX
+      target.y = px * MAX
+      kick()
+    }
+    const onLeave = () => {
+      target.x = 0
+      target.y = 0
+      kick()
+    }
+    wrap.addEventListener('mousemove', onMove)
+    wrap.addEventListener('mouseleave', onLeave)
+    return () => {
+      wrap.removeEventListener('mousemove', onMove)
+      wrap.removeEventListener('mouseleave', onLeave)
+      if (raf !== null) cancelAnimationFrame(raf)
+    }
+  }, [fine, reduced])
+
+  return (
+    <div className="hero-demo" ref={wrapRef}>
+      <div className="demo-float">
+        <div className="demo-idle">
+          <div className="demo-tilt" ref={tiltRef}>
+            {children}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -331,7 +512,7 @@ function DownloadButton() {
 
   return (
     <div className="download-group">
-      <a href={url} className="btn btn-primary" download>
+      <a href={url} className="btn btn-primary btn-lg" download>
         <span className="btn-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
@@ -381,7 +562,7 @@ sudo apt install ./live-text-ocr_1.0.1-1_arm64.deb`,
             arm64
           </button>
         </div>
-        <button className="copy-btn" onClick={copy}>
+        <button className={cx('copy-btn', copied && 'copied')} onClick={copy}>
           {copied ? (
             <>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -408,13 +589,8 @@ sudo apt install ./live-text-ocr_1.0.1-1_arm64.deb`,
 }
 
 function CommandCard({ c, i, onCopy }) {
-  const [ref, visible] = useOnScreen()
   return (
-    <div
-      ref={ref}
-      className={cx('command-card', visible && 'reveal')}
-      style={{ transitionDelay: `${i * 70}ms` }}
-    >
+    <Reveal className="command-card" delay={i * 60}>
       <code>{c.cmd}</code>
       <span>{c.desc}</span>
       <button
@@ -428,45 +604,59 @@ function CommandCard({ c, i, onCopy }) {
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
       </button>
-    </div>
+    </Reveal>
   )
 }
 
-function CommandGrid({ onCopy }) {
+function FeatureCard({ feature, i }) {
   return (
-    <div className="command-grid">
-      {COMMANDS.map((c, i) => (
-        <CommandCard key={c.cmd} c={c} i={i} onCopy={onCopy} />
-      ))}
-    </div>
-  )
-}
-
-function FeatureCard({ feature }) {
-  const [ref, visible] = useOnScreen()
-  return (
-    <div ref={ref} className={cx('feature-card', visible && 'reveal')}>
+    <Reveal className="feature-card" delay={i * 60}>
       <Icon name={feature.icon} />
       <h3>{feature.title}</h3>
       <p>{feature.desc}</p>
-    </div>
+    </Reveal>
   )
 }
 
 function Step({ step, i }) {
-  const [ref, visible] = useOnScreen()
   return (
-    <div ref={ref} className={cx('step', visible && 'reveal')} style={{ transitionDelay: `${i * 90}ms` }}>
+    <Reveal className="step" delay={i * 90}>
       <div className="step-number">{step.n}</div>
       <h3>{step.title}</h3>
       <p>{step.desc}</p>
+    </Reveal>
+  )
+}
+
+function Marquee() {
+  return (
+    <div className="marquee-strip">
+      <div className="container marquee-inner">
+        <span className="marquee-label">works over</span>
+        <div className="marquee">
+          <div className="marquee-track" aria-hidden="true">
+            {[...SURFACES, ...SURFACES].map((s, i) => (
+              <span key={i} className="marquee-item">
+                {s}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
 function App() {
-  const { toast, show } = useToast()
-  const [heroRef, heroVisible] = useOnScreen()
+  const { toast, toastVisible, show } = useToast()
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   const handleCopy = (text) => {
     if (navigator.clipboard && text) {
@@ -480,7 +670,7 @@ function App() {
     <div className="landing">
       <div className="ambient-glow" />
 
-      <header className="site-header">
+      <header className={cx('site-header', scrolled && 'scrolled')}>
         <div className="container header-inner">
           <a href="#" className="brand">
             <Logo />
@@ -498,20 +688,29 @@ function App() {
       </header>
 
       <main>
-        <section className="hero" ref={heroRef}>
-          <div className={cx('container hero-inner', heroVisible && 'reveal')}>
+        <section className="hero">
+          <div className="container hero-inner">
             <div className="hero-text">
-              <span className="eyebrow">Ubuntu · Wayland · X11</span>
+              <span className="eyebrow rise" style={{ animationDelay: '0ms' }}>
+                Ubuntu · Wayland · X11
+              </span>
               <h1>
-                Copy any text on
-                <br />
-                <span className="gradient-text">your screen.</span>
+                <span className="hl-line">
+                  <span className="hl-inner" style={{ animationDelay: '60ms' }}>
+                    Copy any text
+                  </span>
+                </span>
+                <span className="hl-line">
+                  <span className="hl-inner" style={{ animationDelay: '140ms' }}>
+                    on your <span className="gradient-text">screen.</span>
+                  </span>
+                </span>
               </h1>
-              <p className="subtitle">
+              <p className="subtitle rise" style={{ animationDelay: '260ms' }}>
                 A native OCR utility that turns paused videos, PDFs, slides, and terminals into
                 selectable, copyable text — instantly and locally.
               </p>
-              <div className="shortcut-pills">
+              <div className="shortcut-pills rise" style={{ animationDelay: '340ms' }}>
                 <div className="shortcut-pill">
                   <kbd>Super</kbd>
                   <span>+</span>
@@ -529,7 +728,7 @@ function App() {
                   <span className="pill-sep">overlay</span>
                 </div>
               </div>
-              <div className="hero-actions">
+              <div className="hero-actions rise" style={{ animationDelay: '420ms' }}>
                 <a href="#install" className="btn btn-primary btn-lg">
                   Get live-text-ocr
                 </a>
@@ -544,26 +743,26 @@ function App() {
               </div>
             </div>
 
-            <div className="hero-demo">
-              <div className="demo-float">
-                <TerminalDemo onCopy={handleCopy} />
-              </div>
-            </div>
+            <HeroDemo>
+              <TerminalDemo onCopy={handleCopy} />
+            </HeroDemo>
           </div>
         </section>
 
+        <Marquee />
+
         <section id="features" className="section">
           <div className="container">
-            <div className="section-head">
+            <Reveal className="section-head">
               <span className="eyebrow">Features</span>
               <h2 className="section-title">Built for the desktop.</h2>
               <p className="section-lead">
                 Everything you need to grab text from anywhere on Ubuntu, without sending a single pixel to the cloud.
               </p>
-            </div>
+            </Reveal>
             <div className="feature-grid">
-              {FEATURES.map((f) => (
-                <FeatureCard key={f.title} feature={f} />
+              {FEATURES.map((f, i) => (
+                <FeatureCard key={f.title} feature={f} i={i} />
               ))}
             </div>
           </div>
@@ -571,10 +770,10 @@ function App() {
 
         <section id="how" className="section alt">
           <div className="container">
-            <div className="section-head">
+            <Reveal className="section-head">
               <span className="eyebrow">How it works</span>
               <h2 className="section-title">Three keys to copy.</h2>
-            </div>
+            </Reveal>
             <div className="steps">
               {STEPS.map((s, i) => (
                 <Step key={s.n} step={s} i={i} />
@@ -585,31 +784,37 @@ function App() {
 
         <section id="commands" className="section">
           <div className="container">
-            <div className="section-head">
+            <Reveal className="section-head">
               <span className="eyebrow">CLI</span>
               <h2 className="section-title">Commands you will actually use.</h2>
+            </Reveal>
+            <div className="command-grid">
+              {COMMANDS.map((c, i) => (
+                <CommandCard key={c.cmd} c={c} i={i} onCopy={handleCopy} />
+              ))}
             </div>
-            <CommandGrid onCopy={handleCopy} />
           </div>
         </section>
 
         <section id="install" className="section alt">
           <div className="container narrow">
-            <div className="section-head">
+            <Reveal className="section-head">
               <span className="eyebrow">Install</span>
               <h2 className="section-title">Ready in seconds.</h2>
               <p className="section-lead">
                 Download the .deb for your architecture, or paste the terminal command. apt handles the rest.
               </p>
-            </div>
-            <DownloadButton />
-            <InstallBlock />
-            <div className="badges">
+            </Reveal>
+            <Reveal delay={120}>
+              <DownloadButton />
+              <InstallBlock />
+            </Reveal>
+            <Reveal className="badges" delay={240}>
               <span>Ubuntu</span>
               <span>Wayland</span>
               <span>X11</span>
               <span>MIT License</span>
-            </div>
+            </Reveal>
           </div>
         </section>
       </main>
@@ -631,7 +836,12 @@ function App() {
         </div>
       </footer>
 
-      {toast && <div className="toast">{toast}</div>}
+      <div className="toast" data-visible={toastVisible} aria-live="polite">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        <span>{toast}</span>
+      </div>
     </div>
   )
 }

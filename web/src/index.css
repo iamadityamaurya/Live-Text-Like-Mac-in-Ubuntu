@@ -1,21 +1,25 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-/* macOS-style glossy dark palette */
 :root {
-  --bg: #0a0a0c;
-  --panel: rgba(22, 22, 26, 0.72);
-  --panel-2: rgba(34, 34, 40, 0.9);
-  --border: rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.12);
-  --text: #a8a8b0;
-  --text-h: #ffffff;
-  --text-muted: #6e6e76;
-  --accent: #e8e8ed;
-  --accent-soft: rgba(255, 255, 255, 0.10);
-  --accent-glow: rgba(255, 255, 255, 0.18);
-  --link: #ffffff;
+  /* palette — dark glass with a single Ubuntu-orange accent */
+  --bg: #08080b;
+  --panel: rgba(255, 255, 255, 0.03);
+  --panel-strong: rgba(18, 18, 22, 0.85);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --text: #a2a2ac;
+  --text-h: #f5f5f7;
+  --text-muted: #66666f;
+  --accent: #e95420;
+  --accent-bright: #ff7a45;
+  --accent-soft: rgba(233, 84, 32, 0.14);
+  --accent-glow: rgba(233, 84, 32, 0.4);
   --success: #30d158;
-  --warning: #ff9f0a;
+
+  /* motion tokens */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
   --sans: 'Inter', 'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
@@ -42,34 +46,15 @@ body {
   margin: 0;
   min-height: 100svh;
   background:
-    radial-gradient(ellipse 70% 40% at 20% -10%, rgba(120, 120, 140, 0.16), transparent),
-    radial-gradient(ellipse 60% 50% at 90% 20%, rgba(120, 120, 140, 0.08), transparent),
-    radial-gradient(ellipse 70% 50% at 50% 110%, rgba(120, 120, 140, 0.12), transparent),
+    radial-gradient(ellipse 70% 42% at 22% -12%, rgba(233, 84, 32, 0.07), transparent),
+    radial-gradient(ellipse 60% 50% at 90% 14%, rgba(255, 255, 255, 0.05), transparent),
+    radial-gradient(ellipse 70% 50% at 50% 112%, rgba(255, 255, 255, 0.045), transparent),
     var(--bg);
 }
 
-.landing {
-  position: relative;
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  overflow-x: hidden;
-}
-
-.ambient-glow {
-  position: absolute;
-  top: -20%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 80vw;
-  height: 80vw;
-  max-width: 900px;
-  max-height: 900px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(140, 140, 160, 0.16), transparent 60%);
-  filter: blur(100px);
-  pointer-events: none;
-  z-index: 0;
+::selection {
+  background: rgba(233, 84, 32, 0.4);
+  color: #fff;
 }
 
 #root {
@@ -104,7 +89,8 @@ button {
 }
 
 code,
-pre {
+pre,
+kbd {
   font-family: var(--mono);
 }
 
@@ -126,11 +112,5 @@ pre {
 
   .container {
     padding: 0 20px;
-  }
-
-  .ambient-glow {
-    width: 120vw;
-    height: 120vw;
-    top: -10%;
   }
 }
